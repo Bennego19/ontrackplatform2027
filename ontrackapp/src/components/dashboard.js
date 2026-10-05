@@ -21,15 +21,6 @@ const Dashboard = () => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Login form state
-  const [activeTab, setActiveTab] = useState('admin');
-  const [loginError, setLoginError] = useState('');
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [credentials, setCredentials] = useState({ 
-    username: '', 
-    password: ''
-  });
-
   // ONLY LOAD DASHBOARD DATA WHEN AUTHENTICATED AS ADMIN
   const shouldLoadDashboardData = isAuthenticated && userData?.role === 'admin';
 
@@ -159,6 +150,7 @@ const Dashboard = () => {
           if (isMounted) {
             setIsAuthenticated(false);
             setLoading(false);
+            navigate('/'); // Redirect to login if no token
           }
           return;
         }
@@ -189,6 +181,7 @@ const Dashboard = () => {
           tokenManager.removeToken();
           localStorage.removeItem('role');
           setIsAuthenticated(false);
+          navigate('/'); // Redirect to login on failure
         }
       } catch (error) {
         console.error('Auth check failed:', error);
@@ -196,6 +189,7 @@ const Dashboard = () => {
           tokenManager.removeToken();
           localStorage.removeItem('role');
           setIsAuthenticated(false);
+          navigate('/'); // Redirect to login on error
         }
       } finally {
         if (isMounted) {
@@ -211,60 +205,12 @@ const Dashboard = () => {
     };
   }, [navigate]);
 
-  // Handle login
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setIsLoggingIn(true);
-    setLoginError('');
-
-    try {
-      let response;
-      if (activeTab === 'admin') {
-        response = await authAPI.adminLogin(credentials.username, credentials.password);
-      } else {
-        // Student login - only username and password
-        response = await authAPI.login(credentials.username, credentials.password);
-      }
-
-      if (response.success) {
-        tokenManager.setToken(response.token);
-        setIsAuthenticated(true);
-        setUserData(response.user);
-        
-        // Store role in localStorage for App.js routing
-        localStorage.setItem('role', response.user.role);
-        
-        // Redirect based on role
-        if (response.user.role === 'admin') {
-          navigate('/dashboard');
-        } else {
-          navigate('/userdashboard');
-        }
-      } else {
-        setLoginError(response.message || 'Login failed');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      setLoginError('Login failed. Please try again.');
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
-  const handleInputChange = (e) => {
-    setCredentials({
-      ...credentials,
-      [e.target.name]: e.target.value
-    });
-  };
-
   // Handle logout
   const handleLogout = () => {
     tokenManager.removeToken();
     localStorage.removeItem('role');
     setIsAuthenticated(false);
     setUserData(null);
-    setCredentials({ username: '', password: '' });
     navigate('/');
   };
 
@@ -301,89 +247,8 @@ const Dashboard = () => {
 
   // If NOT authenticated, show login page with tabs
   if (!isAuthenticated) {
-    return (
-      <div className="dashboard-login-page">
-        <div className="login-header">
-          <h1 className="login-title">OnTrack Connect</h1>
-          <p className="login-subtitle">Welcome to your learning platform</p>
-        </div>
-        
-        <div className="login-container">
-          <div className="login-tabs">
-            <button
-              className={`tab-button ${activeTab === 'admin' ? 'active' : ''}`}
-              onClick={() => setActiveTab('admin')}
-            >
-              Admin Login
-            </button>
-            <button
-              className={`tab-button ${activeTab === 'student' ? 'active' : ''}`}
-              onClick={() => setActiveTab('student')}
-            >
-              Student Login
-            </button>
-          </div>
-
-          <form onSubmit={handleLogin} className="login-form">
-            {loginError && <div className="error-message">{loginError}</div>}
-            
-            <h3>{activeTab === 'admin' ? 'Admin Login' : 'Student Login'}</h3>
-            
-            <div className="form-group">
-              <label htmlFor="username">Username</label>
-              <input
-                type="text"
-                id="username"
-                name="username"
-                value={credentials.username}
-                onChange={handleInputChange}
-                required
-                disabled={isLoggingIn}
-                placeholder="Enter your username"
-              />
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={credentials.password}
-                onChange={handleInputChange}
-                required
-                disabled={isLoggingIn}
-                placeholder="Enter your password"
-              />
-            </div>
-            
-            <button
-              type="submit"
-              className="login-btn"
-              disabled={isLoggingIn}
-            >
-              {isLoggingIn ? 'Logging in...' : `Login as ${activeTab === 'admin' ? 'Admin' : 'Student'}`}
-            </button>
-
-            <div className="signup-section">
-              <p>
-                Don't have an account? <a href="/SignUp" className="signup-link">Sign up here</a>
-              </p>
-            </div>
-          </form>
-        </div>
-
-        <div className="demo-accounts">
-          <h4>Demo Accounts:</h4>
-          <p>Admin: admin@example.com / admin123</p>
-          <p>Student: student@example.com / student123</p>
-        </div>
-
-        <div className="copyright">
-          © {new Date().getFullYear()} OnTrack Connect. All rights reserved.
-        </div>
-      </div>
-    );
+    console.log("User is not logged in");
+    return null; // Will redirect via useEffect
   }
 
   // If authenticated but user is not admin, don't show admin dashboard

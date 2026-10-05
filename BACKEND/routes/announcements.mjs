@@ -1,14 +1,24 @@
 import express from "express";
-import db from "../db/conn.mjs";
+import getDatabase from "../db/conn.mjs";
 import { ObjectId } from "mongodb";
 import { authenticateToken } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// Middleware to inject DB into req object
+router.use(async (req, res, next) => {
+    try {
+        req.db = await getDatabase();
+        next();
+    } catch (error) {
+        res.status(503).json({ error: "Database connection unavailable" });
+    }
+});
+
 // List public announcements (most recent first)
 router.get("/", async (req, res) => {
   try {
-    const announcements = await db.collection("announcements")
+    const announcements = await req.db.collection("announcements")
       .find({})
       .sort({ postedAt: -1 })
       .toArray();
@@ -32,7 +42,7 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "Invalid ID" });
-    const a = await db.collection("announcements").findOne({ _id: new ObjectId(req.params.id) });
+    const a = await req.db.collection("announcements").findOne({ _id: new ObjectId(req.params.id) });
     if (!a) return res.status(404).json({ error: "Announcement not found" });
     res.json({ id: a._id, title: a.title, message: a.message, postedAt: a.postedAt, author: a.author || null });
   } catch (err) {
@@ -54,7 +64,7 @@ router.post("/", authenticateToken, async (req, res) => {
       author: req.dbUser?.email || req.dbUser?.username || null
     };
 
-    const result = await db.collection("announcements").insertOne(doc);
+    const result = await req.db.collection("announcements").insertOne(doc);
     res.status(201).json({ message: "Announcement created", id: result.insertedId });
   } catch (err) {
     console.error("Failed to create announcement:", err);
@@ -71,7 +81,7 @@ router.put("/:id", authenticateToken, async (req, res) => {
     if (title !== undefined) update.title = title;
     if (message !== undefined) update.message = message;
 
-    const result = await db.collection("announcements").updateOne({ _id: new ObjectId(req.params.id) }, { $set: update });
+    const result = await req.db.collection("announcements").updateOne({ _id: new ObjectId(req.params.id) }, { $set: update });
     if (result.matchedCount === 0) return res.status(404).json({ error: "Announcement not found" });
     res.json({ message: "Announcement updated" });
   } catch (err) {
@@ -84,7 +94,7 @@ router.put("/:id", authenticateToken, async (req, res) => {
 router.delete("/:id", authenticateToken, async (req, res) => {
   try {
     if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ error: "Invalid ID" });
-    const result = await db.collection("announcements").deleteOne({ _id: new ObjectId(req.params.id) });
+    const result = await req.db.collection("announcements").deleteOne({ _id: new ObjectId(req.params.id) });
     if (result.deletedCount === 0) return res.status(404).json({ error: "Announcement not found" });
     res.json({ message: "Announcement deleted" });
   } catch (err) {

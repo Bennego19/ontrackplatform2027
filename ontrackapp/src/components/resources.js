@@ -10,7 +10,6 @@ export default function ManageResources() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errors, setErrors] = useState([]);
   const [resources, setResources] = useState([]);
-  const [updateResources, setUpdateResources] = useState([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -20,7 +19,6 @@ export default function ManageResources() {
   });
 
   const [updateFormData, setUpdateFormData] = useState({});
-  const [deleteId, setDeleteId] = useState("");
 
   const navigate = useNavigate();
 
@@ -101,8 +99,8 @@ export default function ManageResources() {
     setLoading(false);
   };
 
-  // READ TAB FUNCTIONS
   const loadResources = async () => {
+    setLoading(true);
     try {
       const token = tokenManager.getToken();
       const response = await axios.get("/api/resources", {
@@ -119,26 +117,7 @@ export default function ManageResources() {
         showMessage("Failed to load resources.", "error");
       }
     }
-  };
-
-  // UPDATE TAB FUNCTIONS
-  const loadUpdateTable = async () => {
-    try {
-      const token = tokenManager.getToken();
-      const response = await axios.get("/api/resources", {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      setUpdateResources(response.data);
-    } catch (error) {
-      console.error("Error loading resources for update:", error);
-      if (error.response?.status === 403) {
-        showMessage("Access denied. Please log in again.", "error");
-      } else {
-        showMessage("Failed to load resources for update.", "error");
-      }
-    }
+    setLoading(false);
   };
 
   const handleUpdateChange = (id, field, value) => {
@@ -164,7 +143,6 @@ export default function ManageResources() {
 
       showMessage(`✅ Resource ${id} updated successfully!`);
       loadResources();
-      loadUpdateTable();
     } catch (error) {
       console.error(error);
       if (error.response?.status === 403) {
@@ -177,7 +155,7 @@ export default function ManageResources() {
 
   const cancelEdit = (id) => {
     showMessage(`❌ Edit for Resource ${id} cancelled`);
-    loadUpdateTable();
+    loadResources();
   };
 
   // DELETE TAB FUNCTIONS
@@ -208,14 +186,11 @@ export default function ManageResources() {
     setActiveTab(tab);
     setErrors([]);
     setSuccessMessage("");
-    if (tab === "read") loadResources();
-    if (tab === "update") loadUpdateTable();
-    if (tab === "delete") loadResources();
+    loadResources();
   };
 
   useEffect(() => {
     loadResources();
-    loadUpdateTable();
   }, []);
 
   const isCreateFormValid =
@@ -349,4 +324,189 @@ export default function ManageResources() {
                         <input
                           type="file"
                           className="form-input"
-                          onChange={(e) => handleFormChange("document", e.target.files[0])}
+onChange={(e) => handleFormChange("document", e.target.files[0])}
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Description / Website Link</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={formData.description || ""}
+                        onChange={(e) => handleFormChange("description", e.target.value)}
+                        placeholder="Brief description or URL"
+                        disabled={loading}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="submit-button"
+                      disabled={loading || !isCreateFormValid}
+                    >
+                      {loading ? "Creating..." : "Create Resource"}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* READ (VIEW) TAB */}
+            {activeTab === "read" && (
+              <div className="tab-pane-mentorship active">
+                <h3 className="section-title">Available Resources</h3>
+                <div className="table-responsive">
+                  <table className="mentorship-table">
+                    <thead>
+                      <tr>
+                        <th>Resource Name</th>
+                        <th>Program</th>
+                        <th>Track</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resources.length > 0 ? (
+                        resources.map((res) => (
+                          <tr key={res._id}>
+                            <td className="font-bold">{res.name}</td>
+                            <td>{res.program}</td>
+                            <td>{formatTrackName(res.track)}</td>
+                            <td>
+                              {res.document ? (
+                                <span className="badge-file">📄 Document</span>
+                              ) : (
+                                <span className="badge-link">🔗 Link/Text</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="4" className="text-center">No resources found.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* UPDATE TAB */}
+            {activeTab === "update" && (
+              <div className="tab-pane-mentorship active">
+                <h3 className="section-title">Edit Existing Resources</h3>
+                <div className="table-responsive">
+                  <table className="mentorship-table">
+                    <thead>
+                      <tr>
+                        <th>Resource Info</th>
+                        <th>Categorization</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resources.map((res) => (
+                        <tr key={res._id}>
+                          <td>
+                            <input
+                              type="text"
+                              className="inline-input"
+                              placeholder={res.name}
+                              onChange={(e) => handleUpdateChange(res._id, "name", e.target.value)}
+                            />
+                            <input
+                              type="text"
+                              className="inline-input mt-1"
+                              placeholder="Update description/link"
+                              onChange={(e) => handleUpdateChange(res._id, "description", e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <select
+                              className="inline-select"
+                              onChange={(e) => handleUpdateChange(res._id, "program", e.target.value)}
+                            >
+                              <option value="">{res.program}</option>
+                              {programs.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                            <select
+                              className="inline-select mt-1"
+                              onChange={(e) => handleUpdateChange(res._id, "track", e.target.value)}
+                            >
+                              <option value="">{formatTrackName(res.track)}</option>
+                              {tracks.map(t => <option key={t} value={t}>{formatTrackName(t)}</option>)}
+                            </select>
+                          </td>
+                          <td>
+                            <div className="action-buttons">
+                              <button 
+                                onClick={() => updateResource(res._id)} 
+                                className="btn-save"
+                              >
+                                Save
+                              </button>
+                              <button 
+                                onClick={() => cancelEdit(res._id)} 
+                                className="btn-cancel"
+                              >
+                                Reset
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* DELETE TAB */}
+            {activeTab === "delete" && (
+              <div className="tab-pane-mentorship active">
+                <h3 className="section-title text-danger">Remove Resources</h3>
+                <div className="table-responsive">
+                  <table className="mentorship-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Program</th>
+                        <th>Track</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resources.map((res) => (
+                        <tr key={res._id}>
+                          <td>{res.name}</td>
+                          <td>{res.program}</td>
+                          <td>{formatTrackName(res.track)}</td>
+                          <td>
+                            <button
+                              className="btn-delete"
+                              onClick={() => {
+                                if (window.confirm(`Delete "${res.name}"?`)) {
+                                  handleDeleteSubmit(res._id);
+                                }
+                              }}
+                            >
+                              🗑️ Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

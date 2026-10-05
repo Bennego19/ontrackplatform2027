@@ -10,7 +10,8 @@ var store = new ExpressBrute.MemoryStore();
 var bruteforce = new ExpressBrute(store);
 
 router.get("/",bruteforce.prevent, async (req,res) =>{
-    let collection = await db.collection("skillsdevelopment");
+    const database = await db();
+    let collection = database.collection("skillsdevelopment");
     let results = await collection.find({}).toArray();
     res.status(200).json(results);
 });
@@ -31,7 +32,8 @@ router.post("/resources",bruteforce.prevent, async(req,res) =>{
       
     };
 
-    let collection = await db.collection("skillsdevelopment");
+    const database = await db();
+    let collection = database.collection("skillsdevelopment");
     let result = await collection.insertOne(newDocument);
     res.status(201).json(result);
 }
@@ -49,7 +51,8 @@ router.patch("/:id",bruteforce.prevent, async (req, res) => {
       },
     };
 
-    let collection = db.collection("skillsdevelopment");
+    const database = await db();
+    let collection = database.collection("skillsdevelopment");
     let result = await collection.updateOne(query, updates); 
     res.status(200).json(result);
   });
@@ -59,7 +62,8 @@ router.patch("/:id",bruteforce.prevent, async (req, res) => {
   router.delete("/:id",bruteforce.prevent, async(req,res) =>{
         const query = { _id: new ObjectId(req.params.id) };
 
-        const collection = db.collection("skillsdevelopment");
+        const database = await db();
+        const collection = database.collection("skillsdevelopment");
         let result = await collection.deleteOne(query);
 
         res.status(200).json(result);

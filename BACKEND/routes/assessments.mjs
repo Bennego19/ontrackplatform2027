@@ -1,5 +1,5 @@
 import express from "express";
-import db from "../db/conn.mjs";
+import getDatabase from "../db/conn.mjs";
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -31,44 +31,44 @@ const upload = multer({
 
 const router = express.Router();
 
+/**
+ * ROBUSTNESS MIDDLEWARE
+ * This ensures that 'req.db' is available for every route below.
+ */
+router.use(async (req, res, next) => {
+    try {
+        req.db = await getDatabase();
+        next();
+    } catch (error) {
+        console.error("Database Injection Middleware Error:", error);
+        res.status(503).json({ error: "Database connection unavailable" });
+    }
+});
+
 // GET / - Basic info endpoint
-router.get("/", (req, res) => {
+router.get("/info", (req, res) => {
   res.json({
     message: "OnTrack Connect Assessments API",
     version: "1.0.0",
     endpoints: {
-      "GET /": "API information",
+      "GET /": "Fetch assessments with filters",
       "GET /total": "Get total assessments count",
       "GET /totals-by-program": "Get assessment totals by program",
       "GET /totals-by-type": "Get assessment totals by type",
       "GET /tasks": "Get tasks (authenticated)",
-      "GET /modules": "Get modules (authenticated)",
-      "GET /assignments": "Get assignments (authenticated)",
-      "GET /projects": "Get projects (authenticated)",
-      "GET /resources": "Get resources (authenticated)",
       "POST /": "Create assessment (authenticated)",
-      "PATCH /:id": "Update assessment (authenticated)",
-      "DELETE /:id": "Delete assessment (authenticated)",
-      "GET /download/:id": "Download assessment file"
     },
     timestamp: new Date().toISOString()
   });
 });
 
-/* Using shared `authenticateToken` middleware from ../middleware/auth.js */
 /* ========================= HELPERS ========================= */
-
-const typeQuery = (type, program, track) => ({
-    assessmenttype: { $regex: new RegExp(`^${type}$`, "i") },
-    program: { $regex: new RegExp(`^${program}$`, "i") },
-    track: { $regex: new RegExp(`^${track}$`, "i") }
-});
 
 const userTypeQuery = (type, user) => ({
     assessmenttype: { $regex: new RegExp(`^${type}$`, "i") },
     $or: [
-        { program: user.program },
-        { track: user.track },
+        { program: user?.program },
+        { track: user?.track },
         { isGeneral: true }
     ]
 });
@@ -83,9 +83,9 @@ router.get("/", authenticateToken, async (req, res) => {
         if (program) query.program = { $regex: new RegExp(`^${program}$`, "i") };
         if (track) query.track = { $regex: new RegExp(`^${track}$`, "i") };
 
-        const results = await db.collection("assessments").find(query).toArray();
+        const results = await req.db.collection("assessments").find(query).toArray();
         res.json(results);
-    } catch {
+    } catch (error) {
         res.status(500).json({ error: "Failed to fetch assessments" });
     }
 });
@@ -114,9 +114,9 @@ router.post("/", authenticateToken, upload.single("document"), async (req, res) 
             };
         }
 
-        const result = await db.collection("assessments").insertOne(doc);
+        const result = await req.db.collection("assessments").insertOne(doc);
         res.status(201).json({ message: "Assessment created", id: result.insertedId });
-    } catch {
+    } catch (error) {
         res.status(500).json({ error: "Failed to create assessment" });
     }
 });
@@ -127,14 +127,13 @@ router.patch("/:id", authenticateToken, upload.single("document"), async (req, r
             return res.status(400).json({ error: "Invalid ID" });
         }
 
-        const collection = db.collection("assessments");
+        const collection = req.db.collection("assessments");
         const current = await collection.findOne({ _id: new ObjectId(req.params.id) });
 
         if (!current) {
             return res.status(404).json({ error: "Assessment not found" });
         }
 
-        // Validate required fields are not blank if they are being updated
         const requiredFields = ['assessmentname', 'assessmenttype', 'program', 'track', 'dateadded', 'datedue'];
         const validationErrors = [];
 
@@ -146,20 +145,14 @@ router.patch("/:id", authenticateToken, upload.single("document"), async (req, r
         });
 
         if (validationErrors.length > 0) {
-            return res.status(400).json({
-                message: "Validation failed",
-                errors: validationErrors
-            });
+            return res.status(400).json({ message: "Validation failed", errors: validationErrors });
         }
 
         if (req.file && current.document?.filePath && fs.existsSync(current.document.filePath)) {
             fs.unlinkSync(current.document.filePath);
         }
 
-        const update = {
-            updatedAt: new Date()
-        };
-
+        const update = { updatedAt: new Date() };
         if (req.body.assessmentname !== undefined) update.assessmentname = req.body.assessmentname.trim();
         if (req.body.assessmenttype !== undefined) update.assessmenttype = req.body.assessmenttype?.toLowerCase().trim();
         if (req.body.program !== undefined) update.program = req.body.program.trim();
@@ -181,7 +174,7 @@ router.patch("/:id", authenticateToken, upload.single("document"), async (req, r
 
         await collection.updateOne({ _id: current._id }, { $set: update });
         res.json({ message: "Assessment updated" });
-    } catch {
+    } catch (error) {
         res.status(500).json({ error: "Failed to update assessment" });
     }
 });
@@ -192,7 +185,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
             return res.status(400).json({ error: "Invalid ID" });
         }
 
-        const collection = db.collection("assessments");
+        const collection = req.db.collection("assessments");
         const assessment = await collection.findOne({ _id: new ObjectId(req.params.id) });
 
         if (!assessment) {
@@ -205,7 +198,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
 
         await collection.deleteOne({ _id: assessment._id });
         res.json({ message: "Assessment deleted" });
-    } catch {
+    } catch (error) {
         res.status(500).json({ error: "Failed to delete assessment" });
     }
 });
@@ -214,230 +207,119 @@ router.delete("/:id", authenticateToken, async (req, res) => {
 
 router.get("/tasks", authenticateToken, async (req, res) => {
   try {
-    const tasks = await db.collection("assessments")
+    const tasks = await req.db.collection("assessments")
       .find(userTypeQuery("task", req.dbUser))
       .sort({ datedue: 1 })
       .toArray();
 
-    // Add documentLink field for frontend compatibility
     const tasksWithLinks = tasks.map(task => ({
       ...task,
       documentLink: task.document?.relativePath || null,
-      name: task.assessmentname || task.title || task.name || null,
-      description: task.description || task.instructions || null
+      name: task.assessmentname || null,
+      description: task.description || null
     }));
 
     res.json(tasksWithLinks);
-  } catch {
+  } catch (error) {
     res.status(500).json({ error: "Failed to fetch tasks" });
   }
 });
 
-
 router.get("/modules", authenticateToken, async (req, res) => {
   try {
-    const results = await db.collection("assessments")
+    const results = await req.db.collection("assessments")
       .find(userTypeQuery("module", req.dbUser))
       .toArray();
 
-    // Add documentLink field for frontend compatibility
-    const modulesWithLinks = results.map(module => ({
-      ...module,
-      documentLink: module.document?.relativePath || null,
-      name: module.assessmentname || module.title || module.name || null,
-      description: module.description || module.instructions || null
-    }));
-
-    res.json(modulesWithLinks);
-  } catch {
+    res.json(results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })));
+  } catch (error) {
     res.status(500).json({ error: "Failed to fetch modules" });
   }
 });
 
 router.get("/assignments", authenticateToken, async (req, res) => {
   try {
-    const results = await db.collection("assessments")
+    const results = await req.db.collection("assessments")
       .find(userTypeQuery("assignment", req.dbUser))
       .toArray();
-
-    // Add documentLink field for frontend compatibility
-    const assignmentsWithLinks = results.map(assignment => ({
-      ...assignment,
-      documentLink: assignment.document?.relativePath || null,
-      name: assignment.assessmentname || assignment.title || assignment.name || null,
-      description: assignment.description || assignment.instructions || null
-    }));
-
-    res.json(assignmentsWithLinks);
-  } catch {
+    res.json(results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })));
+  } catch (error) {
     res.status(500).json({ error: "Failed to fetch assignments" });
   }
 });
 
-
 router.get("/projects", authenticateToken, async (req, res) => {
   try {
-    const results = await db.collection("assessments")
+    const results = await req.db.collection("assessments")
       .find(userTypeQuery("project", req.dbUser))
       .toArray();
-
-    // Add documentLink field for frontend compatibility
-    const projectsWithLinks = results.map(project => ({
-      ...project,
-      documentLink: project.document?.relativePath || null,
-      name: project.assessmentname || project.title || project.name || null,
-      description: project.description || project.instructions || null
-    }));
-
-    res.json(projectsWithLinks);
-  } catch {
+    res.json(results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })));
+  } catch (error) {
     res.status(500).json({ error: "Failed to fetch projects" });
   }
 });
 
 router.get("/resources", authenticateToken, async (req, res) => {
   try {
-    const results = await db.collection("assessments")
+    const results = await req.db.collection("assessments")
       .find(userTypeQuery("resource", req.dbUser))
       .toArray();
-
-    // Add documentLink field for frontend compatibility
-    const resourcesWithLinks = results.map(resource => ({
-      ...resource,
-      documentLink: resource.document?.relativePath || null,
-      name: resource.assessmentname || resource.title || resource.name || null,
-      description: resource.description || resource.instructions || null
-    }));
-
-    res.json(resourcesWithLinks);
-  } catch {
+    res.json(results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })));
+  } catch (error) {
     res.status(500).json({ error: "Failed to fetch resources" });
   }
 });
 
-
 router.get("/welcome", async (req, res) => {
-    console.log(`Request received: ${req.method} ${req.path}`);
     res.json({ message: "Welcome to the OnTrack Connect API Service!" });
 });
 
 /* ========================= DASHBOARD ENDPOINTS ========================= */
 
-// GET total assessments count - FOR DASHBOARD - REMOVED RATE LIMITING FOR DASHBOARD
 router.get("/total", async (req, res) => {
   try {
-    const collection = await db.collection("assessments");
-    const total = await collection.countDocuments({});
-
-    res.status(200).json({
-      total: total,
-      message: "Total assessments retrieved successfully"
-    });
+    const total = await req.db.collection("assessments").countDocuments({});
+    res.status(200).json({ total, message: "Total assessments retrieved successfully" });
   } catch (error) {
-    console.error("Error fetching total assessments:", error);
-    res.status(500).json({
-      error: "Failed to fetch total assessments"
-    });
+    res.status(500).json({ error: "Failed to fetch total assessments" });
   }
 });
 
-// GET assessment totals by program - FOR DASHBOARD - REMOVED RATE LIMITING FOR DASHBOARD
 router.get("/totals-by-program", async (req, res) => {
   try {
-    const collection = await db.collection("assessments");
-
-    // Aggregate assessments by program
     const pipeline = [
-      {
-        $match: {
-          program: { $exists: true, $ne: null, $ne: "" }
-        }
-      },
-      {
-        $group: {
-          _id: "$program",
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          program: "$_id",
-          count: 1,
-          _id: 0
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
+      { $match: { program: { $exists: true, $ne: "" } } },
+      { $group: { _id: "$program", count: { $sum: 1 } } },
+      { $project: { program: "$_id", count: 1, _id: 0 } },
+      { $sort: { count: -1 } }
     ];
 
-    const results = await collection.aggregate(pipeline).toArray();
-
-    // Convert to object format for easier frontend consumption
+    const results = await req.db.collection("assessments").aggregate(pipeline).toArray();
     const totals = {};
-    results.forEach(item => {
-      totals[item.program] = item.count;
-    });
+    results.forEach(item => totals[item.program] = item.count);
 
-    res.status(200).json({
-      totals: totals,
-      message: "Assessment totals by program retrieved successfully"
-    });
+    res.status(200).json({ totals, message: "Assessment totals by program retrieved successfully" });
   } catch (error) {
-    console.error("Error fetching assessment totals by program:", error);
-    res.status(500).json({
-      error: "Failed to fetch assessment totals by program"
-    });
+    res.status(500).json({ error: "Failed to fetch assessment totals by program" });
   }
 });
 
-// GET assessment totals by type - FOR DASHBOARD - REMOVED RATE LIMITING FOR DASHBOARD
 router.get("/totals-by-type", async (req, res) => {
   try {
-    const collection = await db.collection("assessments");
-
-    // Aggregate assessments by type
     const pipeline = [
-      {
-        $match: {
-          assessmenttype: { $exists: true, $ne: null, $ne: "" }
-        }
-      },
-      {
-        $group: {
-          _id: "$assessmenttype",
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          type: "$_id",
-          count: 1,
-          _id: 0
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
+      { $match: { assessmenttype: { $exists: true, $ne: "" } } },
+      { $group: { _id: "$assessmenttype", count: { $sum: 1 } } },
+      { $project: { type: "$_id", count: 1, _id: 0 } },
+      { $sort: { count: -1 } }
     ];
 
-    const results = await collection.aggregate(pipeline).toArray();
-
-    // Convert to object format for easier frontend consumption
+    const results = await req.db.collection("assessments").aggregate(pipeline).toArray();
     const totals = {};
-    results.forEach(item => {
-      totals[item.type] = item.count;
-    });
+    results.forEach(item => totals[item.type] = item.count);
 
-    res.status(200).json({
-      totals: totals,
-      message: "Assessment totals by type retrieved successfully"
-    });
+    res.status(200).json({ totals, message: "Assessment totals by type retrieved successfully" });
   } catch (error) {
-    console.error("Error fetching assessment totals by type:", error);
-    res.status(500).json({
-      error: "Failed to fetch assessment totals by type"
-    });
+    res.status(500).json({ error: "Failed to fetch assessment totals by type" });
   }
 });
 
@@ -449,21 +331,17 @@ router.get("/download/:id", async (req, res) => {
             return res.status(400).json({ error: "Invalid ID" });
         }
 
-        const assessment = await db.collection("assessments")
-            .findOne({ _id: new ObjectId(req.params.id) });
+        const assessment = await req.db.collection("assessments").findOne({ _id: new ObjectId(req.params.id) });
 
         if (!assessment?.document || !fs.existsSync(assessment.document.filePath)) {
             return res.status(404).json({ error: "File not found" });
         }
 
         res.setHeader("Content-Type", assessment.document.mimeType);
-        res.setHeader(
-            "Content-Disposition",
-            `attachment; filename="${assessment.document.fileName}"`
-        );
+        res.setHeader("Content-Disposition", `attachment; filename="${assessment.document.fileName}"`);
 
         fs.createReadStream(assessment.document.filePath).pipe(res);
-    } catch {
+    } catch (error) {
         res.status(500).json({ error: "Failed to download file" });
     }
 });
@@ -471,126 +349,45 @@ router.get("/download/:id", async (req, res) => {
 /* ========================= DEBUG / SEED ========================= */
 
 router.get("/debug-database-contents", async (req, res) => {
-    const docs = await db.collection("assessments").find({}).toArray();
-
-    const byType = {};
-    docs.forEach(d => {
-        const t = d.assessmenttype || "unknown";
-        byType[t] ??= [];
-        byType[t].push({ id: d._id, name: d.assessmentname });
-    });
-
-    res.json({
-        totalDocuments: docs.length,
-        byType,
-        programs: [...new Set(docs.map(d => d.program).filter(Boolean))],
-        tracks: [...new Set(docs.map(d => d.track).filter(Boolean))]
-    });
-});
-
-router.post("/create-test-task", async (req, res) => {
-    const { program, track } = req.body;
-
-    const task = {
-        assessmentname: `Test Task - ${program}`,
-        assessmenttype: "task",
-        program,
-        track,
-        datedue: new Date(Date.now() + 7 * 86400000),
-        createdAt: new Date()
-    };
-
-    const result = await db.collection("assessments").insertOne(task);
-    res.status(201).json({ message: "Test task created", id: result.insertedId });
-});
-
-router.post("/create-sample-data", async (req, res) => {
-    const { program, track } = req.body;
-
-    const data = ["task", "module", "assignment", "project"].map(type => ({
-        assessmentname: `${type.toUpperCase()} Sample`,
-        assessmenttype: type,
-        program,
-        track,
-        createdAt: new Date()
-    }));
-
-    const result = await db.collection("assessments").insertMany(data);
-    res.status(201).json({ message: "Sample data created", count: result.insertedCount });
-});
-
-// DELETE all assessments - BE VERY CAREFUL WITH THIS
-// DELETE all assessments - WITH DEBUG LOGGING
-router.delete("/admin/delete-all", async (req, res) => {
-    console.log("DELETE ALL ASSESSMENTS endpoint hit");
-    
     try {
-        // Add admin check - modify based on your user structure
-        // If you don't have isAdmin field, you might check by email or role
-        if (!req.dbUser.email?.includes("admin") && !req.dbUser.role?.includes("admin")) {
-            console.log("Non-admin user attempted delete:", req.dbUser.email || req.dbUser._id);
-            return res.status(403).json({ 
-                error: "Admin access required",
-                user: req.dbUser.email || "unknown"
-            });
-        }
-
-        console.log("Admin user confirmed:", req.dbUser.email || req.dbUser._id);
-
-        // First, find all assessments
-        const assessments = await db.collection("assessments").find({}).toArray();
-        console.log(`Found ${assessments.length} assessments to delete`);
-
-        // Delete all associated files
-        let filesDeleted = 0;
-        let fileErrors = [];
-        
-        assessments.forEach(assessment => {
-            try {
-                if (assessment.document?.filePath && fs.existsSync(assessment.document.filePath)) {
-                    fs.unlinkSync(assessment.document.filePath);
-                    filesDeleted++;
-                    console.log(`Deleted file: ${assessment.document.fileName}`);
-                }
-            } catch (fileError) {
-                console.error(`Error deleting file for assessment ${assessment._id}:`, fileError);
-                fileErrors.push({ assessmentId: assessment._id, error: fileError.message });
-            }
+        const docs = await req.db.collection("assessments").find({}).toArray();
+        const byType = {};
+        docs.forEach(d => {
+            const t = d.assessmenttype || "unknown";
+            byType[t] ??= [];
+            byType[t].push({ id: d._id, name: d.assessmentname });
         });
 
-        // Delete all documents from collection
-        console.log("Deleting from database...");
-        const result = await db.collection("assessments").deleteMany({});
-        console.log(`Database delete result: ${result.deletedCount} documents deleted`);
-        
-        res.json({ 
-            message: `Successfully deleted ${result.deletedCount} assessments`,
-            deletedCount: result.deletedCount,
-            filesDeleted: filesDeleted,
-            fileErrors: fileErrors.length > 0 ? fileErrors : undefined,
-            timestamp: new Date().toISOString()
+        res.json({
+            totalDocuments: docs.length,
+            byType,
+            programs: [...new Set(docs.map(d => d.program).filter(Boolean))],
         });
     } catch (error) {
-        console.error("ERROR in delete-all route:", error);
-        console.error("Error stack:", error.stack);
-        console.error("Request user:", req.dbUser);
-        
-        res.status(500).json({ 
-            error: "Failed to delete all assessments",
-            detailedError: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+        res.status(500).json({ error: "Debug failed" });
     }
 });
 
-// Add this before your delete route to debug
-router.get("/check-auth", authenticateToken, (req, res) => {
-    res.json({
-        message: "Authentication successful",
-        user: req.user,
-        dbUser: req.dbUser,
-        hasDbUser: !!req.dbUser,
-        dbUserKeys: req.dbUser ? Object.keys(req.dbUser) : 'none'
-    });
+router.delete("/admin/delete-all", authenticateToken, async (req, res) => {
+    try {
+        if (!req.dbUser.role?.includes("admin")) {
+            return res.status(403).json({ error: "Admin access required" });
+        }
+
+        const collection = req.db.collection("assessments");
+        const assessments = await collection.find({}).toArray();
+
+        assessments.forEach(assessment => {
+            if (assessment.document?.filePath && fs.existsSync(assessment.document.filePath)) {
+                fs.unlinkSync(assessment.document.filePath);
+            }
+        });
+
+        const result = await collection.deleteMany({});
+        res.json({ message: `Successfully deleted ${result.deletedCount} assessments` });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to delete all assessments" });
+    }
 });
+
 export default router;

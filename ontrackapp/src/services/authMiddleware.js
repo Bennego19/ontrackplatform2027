@@ -1,4 +1,6 @@
-const API_BASE_URL = "";
+// ======================
+// REFACTORED: ontrackapp/src/services/authMiddleware.js
+// ======================
 
 /* =========================
    TOKEN MANAGER
@@ -66,14 +68,15 @@ export const tokenManager = {
 };
 
 /* =========================
-   AUTH API (STUDENTS)
+   AUTH API - All API calls in one place
+   Note: Using relative URLs - these will be proxied in dev
 ========================= */
 
 const authFetch = async (endpoint, options = {}) => {
   const token = tokenManager.getToken();
   if (!token) throw new Error("No authentication token");
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(`${endpoint}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -95,12 +98,12 @@ const authFetch = async (endpoint, options = {}) => {
 };
 
 export const authAPI = {
-  /* ---------- AUTH ---------- */
+  /* ---------- STUDENT AUTH ---------- */
+  
+  // Student login - calls /api/onboardstudents/login
   login: async (username, password) => {
-    // Clear any existing authentication data for secure login
     tokenManager.clearAuth();
 
-    // Send ONLY username, not email
     const payload = { username, password };
 
     const response = await fetch(
@@ -117,7 +120,6 @@ export const authAPI = {
       throw new Error(data.message || "Login failed");
     }
 
-    // Store token and user data
     if (data.token) {
       tokenManager.setToken(data.token);
       tokenManager.setStoredUser(data.user);
@@ -126,14 +128,17 @@ export const authAPI = {
     return data;
   },
 
+  /* ---------- ADMIN AUTH ---------- */
+  
+  // Admin login - calls /api/auth/admin-login
+  // NOTE: The route is mounted at /api/auth, not /api/adminlogin
   adminLogin: async (username, password) => {
-    // Clear any existing authentication data for secure login
     tokenManager.clearAuth();
 
     const payload = { username, password };
 
     const response = await fetch(
-      `/api/adminlogin/adminlogin`,
+      `/api/auth/admin-login`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,7 +151,6 @@ export const authAPI = {
       throw new Error(data.message || "Admin login failed");
     }
 
-    // Store token and user data
     if (data.token) {
       tokenManager.setToken(data.token);
       tokenManager.setStoredUser(data.user);
@@ -155,58 +159,40 @@ export const authAPI = {
     return data;
   },
 
-  // Verify token by calling backend /api/adminlogin/verify; falls back to local decode if server unreachable
+  /* ---------- TOKEN VERIFICATION ---------- */
+  
+  // Verify token - calls /api/auth/verify
+  // This is the correct endpoint (auth.js has /verify route)
   verifyToken: async () => {
-    try {
-      const token = tokenManager.getToken();
-      if (!token) return { success: false, message: 'No token' };
+    const token = tokenManager.getToken();
+    if (!token) return { success: false, message: 'No token' };
 
-      // Call backend verify endpoint
-      const resp = await fetch(`/api/adminlogin/verify`, {
-        method: 'GET',
+    try {
+      const resp = await fetch(`/api/auth/verify`, {
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ token }),
+        signal: AbortSignal.timeout(5000)
       });
 
       if (!resp.ok) {
-        const errData = await resp.json().catch(() => ({}));
-        return { success: false, message: errData.message || 'Server verification failed' };
+        tokenManager.clearAuth();
+        return { success: false, message: 'Token invalid' };
       }
 
       const data = await resp.json();
-      if (data && data.success) {
-        // Update stored user if returned
-        if (data.user) tokenManager.setStoredUser(data.user);
-        return { success: true, user: data.user };
-      }
-
-      return { success: false, message: 'Invalid token' };
+      return data;
     } catch (err) {
-      // Fallback: attempt local decode (useful during development or when server unreachable)
-      try {
-        const token = tokenManager.getToken();
-        if (!token) return { success: false, message: 'No token' };
-        const parts = token.split('.');
-        if (parts.length !== 3) return { success: false, message: 'Invalid token format' };
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-        if (payload.exp && typeof payload.exp === 'number') {
-          const now = Math.floor(Date.now() / 1000);
-          if (payload.exp < now) {
-            tokenManager.clearAuth();
-            return { success: false, message: 'Token expired' };
-          }
-        }
-        const storedUser = tokenManager.getStoredUser();
-        return { success: true, user: storedUser || payload };
-      } catch (e) {
-        tokenManager.clearAuth();
-        return { success: false, message: 'Token verification failed' };
-      }
+      tokenManager.clearAuth();
+      return { success: false, message: 'Token verification failed' };
     }
   },
 
+  /* ---------- USER PROFILE ---------- */
+  
   getProfile: () => authFetch("/api/onboardstudents/profile"),
 
   logout: () => {
@@ -229,8 +215,7 @@ export const authAPI = {
 
   /* ---------- MENTOR ---------- */
 
-  getStudentMentor: () =>
-    authFetch("/api/mentorstudentassignment/student"),
+  getStudentMentor: () => authFetch("/api/mentorstudentassignment/student"),
 
   getAllMentors: async () => {
     const response = await fetch("/api/onboardmentors");

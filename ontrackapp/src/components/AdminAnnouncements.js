@@ -5,7 +5,6 @@ import './AdminAnnouncements.css';
 
 export default function AdminAnnouncements() {
   const [items, setItems] = useState([]);
-  const [updateItems, setUpdateItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -28,24 +27,18 @@ export default function AdminAnnouncements() {
   const load = async () => {
     setLoading(true);
     try {
-      const resp = await axios.get('/api/announcements');
+      const token = tokenManager.getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const resp = await axios.get('/api/announcements', { headers });
       setItems(resp.data || []);
     } catch (err) {
       console.error('Load failed', err);
-      showMessage('Failed to load announcements', 'error');
+      const errorMsg = err.response?.data?.error || 'Failed to load announcements';
+      showMessage(errorMsg, 'error');
     } finally { setLoading(false); }
   };
 
-  const loadUpdateTable = async () => {
-    try {
-      const resp = await axios.get('/api/announcements');
-      setUpdateItems(resp.data || []);
-    } catch (err) {
-      console.error('Failed to load update table', err);
-    }
-  };
-
-  useEffect(() => { load(); loadUpdateTable(); }, []);
+  useEffect(() => { load(); }, []);
 
   const save = async (e) => {
     e && e.preventDefault();
@@ -54,30 +47,36 @@ export default function AdminAnnouncements() {
       if (!title || !message) { showMessage('Title and message required', 'error'); return; }
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       await axios.post('/api/announcements', { title, message }, { headers });
-      setTitle(''); setMessage(''); load(); loadUpdateTable(); showMessage('Announcement created');
+      setTitle(''); setMessage(''); load(); showMessage('Announcement created');
     } catch (err) {
       console.error('Save failed', err);
-      showMessage('Save failed', 'error');
+      const errorMsg = err.response?.data?.error || 'Save failed';
+      showMessage(errorMsg, 'error');
     }
   };
 
   const handleStartEdit = (it) => {
     setActiveTab('update');
-    setEditValues({ id: it.id, title: it.title, message: it.message });
     setEditingId(it.id);
+    setEditValues({ title: it.title, message: it.message });
   };
 
   const handleUpdateSave = async (id) => {
-    const vals = editValues || {};
-    if (!vals.title || !vals.message) { showMessage('Title and message required', 'error'); return; }
+    const { title, message } = editValues;
+    if (!title || !message) { showMessage('Title and message required', 'error'); return; }
     try {
       const token = tokenManager.getToken();
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      await axios.put(`/api/announcements/${id}`, { title: vals.title, message: vals.message }, { headers });
-      setEditValues({}); setEditingId(null); setActiveTab('read'); load(); loadUpdateTable(); showMessage('Announcement updated');
+      await axios.put(`/api/announcements/${id}`, { title, message }, { headers });
+      setEditingId(null);
+      setEditValues({});
+      setActiveTab('read');
+      load();
+      showMessage('Announcement updated');
     } catch (err) {
       console.error('Update failed', err);
-      showMessage('Update failed', 'error');
+      const errorMsg = err.response?.data?.error || 'Update failed';
+      showMessage(errorMsg, 'error');
     }
   };
 
@@ -88,10 +87,11 @@ export default function AdminAnnouncements() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       await axios.delete(`/api/announcements/${id}`, { headers });
       showMessage('Announcement deleted');
-      load(); loadUpdateTable();
+      load();
     } catch (err) {
       console.error('Delete failed', err);
-      showMessage('Delete failed', 'error');
+      const errorMsg = err.response?.data?.error || 'Delete failed';
+      showMessage(errorMsg, 'error');
     }
   };
 
@@ -99,9 +99,7 @@ export default function AdminAnnouncements() {
     setActiveTab(tab);
     setErrors([]);
     setSuccessMessage('');
-    if (tab === 'read') load();
-    if (tab === 'update') loadUpdateTable();
-    if (tab === 'delete') load();
+    load();
   };
 
   return (
@@ -120,14 +118,13 @@ export default function AdminAnnouncements() {
 
         <div className="tab-container-mentorship">
           <div className="tabs-mentorship">
-            <button className={`tab-mentorship ${activeTab === 'create' ? 'active' : ''}`} onClick={() => handleTabChange('create')}>Create Announcement</button>
-            <button className={`tab-mentorship ${activeTab === 'read' ? 'active' : ''}`} onClick={() => handleTabChange('read')}>View Announcements</button>
-            <button className={`tab-mentorship ${activeTab === 'update' ? 'active' : ''}`} onClick={() => handleTabChange('update')}>Update Announcements</button>
-            <button className={`tab-mentorship ${activeTab === 'delete' ? 'active' : ''}`} onClick={() => handleTabChange('delete')}>Delete Announcement</button>
+            <button className={`tab-mentorship ${activeTab === 'create' ? 'active' : ''}`} onClick={() => handleTabChange('create')}>Create</button>
+            <button className={`tab-mentorship ${activeTab === 'read' ? 'active' : ''}`} onClick={() => handleTabChange('read')}>View</button>
+            <button className={`tab-mentorship ${activeTab === 'update' ? 'active' : ''}`} onClick={() => handleTabChange('update')}>Update</button>
+            <button className={`tab-mentorship ${activeTab === 'delete' ? 'active' : ''}`} onClick={() => handleTabChange('delete')}>Delete</button>
           </div>
 
           <div className="tab-content-mentorship">
-            {/* CREATE TAB */}
             {activeTab === 'create' && (
               <div className="tab-pane-mentorship active">
                 <div className="form-section">
@@ -146,41 +143,41 @@ export default function AdminAnnouncements() {
                       </div>
                     </div>
                     <div className="action-section">
-                      <button type="submit" className="submit-button">➕ Create Announcement</button>
+                      <button type="submit" className="submit-button">Create Announcement</button>
                     </div>
                   </form>
                 </div>
               </div>
             )}
 
-            {/* READ TAB */}
             {activeTab === 'read' && (
               <div className="tab-pane-mentorship active">
                 <div className="form-section">
                   <div className="section-header">
                     <h3 className="section-title">View Announcements</h3>
-                    <button onClick={load} className="refresh-button">🔄 Refresh</button>
+                    <button onClick={load} className="refresh-button">Refresh</button>
                   </div>
-
                   <div className="table-container">
                     <table className="data-table">
                       <thead>
                         <tr>
-                          <th>ID</th>
                           <th>Title</th>
                           <th>Message</th>
+                          <th>Author</th>
                           <th>Posted At</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                           {items.map(it => (
                             <tr key={it.id}>
+                              <td>{it.title}</td>
+                              <td>{it.message}</td>
+                              <td>{it.author}</td>
+                              <td>{new Date(it.postedAt).toLocaleString()}</td>
                               <td>
-                                <div style={{ fontWeight: 600 }}>{it.title}</div>
-                                <div style={{ fontSize: 12, color: '#aab6c6' }}>Date: {it.postedAt ? new Date(it.postedAt).toLocaleDateString() : ''}</div>
-                                <div style={{ marginTop: 6, color: '#dbe9ff' }}>{it.message ? (it.message.length > 140 ? it.message.slice(0,137) + '...' : it.message) : ''}</div>
+                                <button onClick={() => handleStartEdit(it)} className="update-btn">Edit</button>
                               </td>
-                              <td>{it.postedAt ? new Date(it.postedAt).toLocaleString() : ''}</td>
                             </tr>
                           ))}
                       </tbody>
@@ -191,67 +188,47 @@ export default function AdminAnnouncements() {
               </div>
             )}
 
-            {/* UPDATE TAB */}
             {activeTab === 'update' && (
               <div className="tab-pane-mentorship active">
                 <div className="form-section">
-                  <h3 className="section-title">Update Announcements</h3>
-                  <p className="section-subtitle">Edit announcement details and save changes</p>
-
-                  <div className="table-container">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>ID</th>
-                          <th>Title</th>
-                          <th>Message</th>
-                          <th>Posted At</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                          {updateItems.map(it => (
-                            <tr key={it.id}>
-                              <td>{it.id}</td>
-                              <td>
-                                <div style={{ fontWeight: 600 }}>{it.title}</div>
-                                <div style={{ fontSize: 12, color: '#aab6c6' }}>Date: {it.postedAt ? new Date(it.postedAt).toLocaleDateString() : ''}</div>
-                                <div style={{ marginTop: 6, color: '#dbe9ff' }}>{it.message ? (it.message.length > 140 ? it.message.slice(0,137) + '...' : it.message) : ''}</div>
-                              </td>
-                              <td>
-                                <input className="update-input" defaultValue={it.title} onChange={(e)=>setEditValues(prev=>({...prev,[it.id]:{...(prev[it.id]||{}),title:e.target.value}}))} />
-                                <input className="update-input" defaultValue={it.message} onChange={(e)=>setEditValues(prev=>({...prev,[it.id]:{...(prev[it.id]||{}),message:e.target.value}}))} />
-                              </td>
-                              <td>{it.postedAt ? new Date(it.postedAt).toLocaleString() : ''}</td>
-                              <td>
-                                <div className="action-buttons">
-                                  <button onClick={() => handleUpdateSave(it.id)} className="update-btn">💾 Save</button>
-                                  <button onClick={() => { setEditValues(prev=>{ const c = {...prev}; delete c[it.id]; return c; }); }} className="cancel-btn">❌ Cancel</button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                    {updateItems.length === 0 && (<div className="no-data-message">No announcements available for update.</div>)}
-                  </div>
+                  <h3 className="section-title">Update Announcement</h3>
+                  {editingId ? (
+                    <form onSubmit={(e) => { e.preventDefault(); handleUpdateSave(editingId); }} className="mentorship-form">
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label className="form-label">Title *</label>
+                          <input type="text" className="form-input" value={editValues.title} onChange={(e) => setEditValues({...editValues, title: e.target.value})} placeholder="Announcement title" required />
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label className="form-label">Message *</label>
+                          <textarea className="form-input" value={editValues.message} onChange={(e) => setEditValues({...editValues, message: e.target.value})} rows={5} placeholder="Announcement message" required />
+                        </div>
+                      </div>
+                      <div className="action-section">
+                        <button type="submit" className="submit-button">Save Changes</button>
+                        <button type="button" onClick={() => { setEditingId(null); setEditValues({}); }} className="cancel-btn">Cancel</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="no-data-message">Select an announcement from the 'View' tab to edit.</div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* DELETE TAB */}
             {activeTab === 'delete' && (
               <div className="tab-pane-mentorship active">
                 <div className="form-section">
                   <h3 className="section-title">Delete Announcement</h3>
-                  <p className="section-subtitle">Permanently remove an announcement from the system</p>
-
                   <div className="table-container">
                     <table className="data-table">
                       <thead>
                         <tr>
                           <th>Title</th>
                           <th>Message</th>
+                          <th>Author</th>
                           <th>Posted At</th>
                           <th>Action</th>
                         </tr>
@@ -259,14 +236,12 @@ export default function AdminAnnouncements() {
                       <tbody>
                           {items.map(it => (
                             <tr key={it.id}>
+                              <td>{it.title}</td>
+                              <td>{it.message}</td>
+                              <td>{it.author}</td>
+                              <td>{new Date(it.postedAt).toLocaleString()}</td>
                               <td>
-                                <div style={{ fontWeight: 600 }}>{it.title}</div>
-                                <div style={{ fontSize: 12, color: '#aab6c6' }}>Date: {it.postedAt ? new Date(it.postedAt).toLocaleDateString() : ''}</div>
-                                <div style={{ marginTop: 6, color: '#dbe9ff' }}>{it.message ? (it.message.length > 140 ? it.message.slice(0,137) + '...' : it.message) : ''}</div>
-                              </td>
-                              <td>{it.postedAt ? new Date(it.postedAt).toLocaleDateString() : ''}</td>
-                              <td>
-                                <button onClick={() => handleDeleteSubmit(it.id)} className="delete-btn">🗑️ Delete</button>
+                                <button onClick={() => handleDeleteSubmit(it.id)} className="delete-btn">Delete</button>
                               </td>
                             </tr>
                           ))}

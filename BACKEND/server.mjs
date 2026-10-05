@@ -3,7 +3,6 @@ import https from "https";
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mentorstudentassignment from './routes/mentorstudentassignment.mjs';
-// Import your routes
 import onboardstudents from './routes/onboardstudents.mjs';
 import onboardmentors from './routes/onboardmentors.mjs';
 import programs from './routes/programs.mjs';
@@ -18,7 +17,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
-import db from './db/conn.mjs'; // Import your database connection
+import { getDatabase, getConnectionStatus, initializeDatabase, closeDatabase } from './db/conn.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,10 +29,11 @@ if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
     console.log('✅ Uploads directory created');
 }
+
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Add connection status tracking
 let dbConnectionStatus = 'DISCONNECTED';
@@ -42,18 +42,19 @@ let serverStatus = 'STOPPED';
 // Function to check database connection
 const checkDatabaseConnection = async () => {
   try {
-    if (db) {
+    const dbInstance = await getDatabase(); // Corrected: use getDatabase
+    if (dbInstance) {
       // Try to ping the database
-      const adminDb = db.admin();
+      const adminDb = dbInstance.admin();
       const pingResult = await adminDb.ping();
       
       if (pingResult && pingResult.ok === 1) {
         dbConnectionStatus = 'CONNECTED';
         console.log('✅ Database connection: CONNECTED');
-        console.log(`📊 Database name: ${db.databaseName}`);
+        console.log(`📊 Database name: ${dbInstance.databaseName}`);
         
         // List collections
-        const collections = await db.listCollections().toArray();
+        const collections = await dbInstance.listCollections().toArray();
         console.log(`📁 Collections found: ${collections.length}`);
         collections.forEach(col => {
           console.log(`   - ${col.name}`);
@@ -70,15 +71,75 @@ const checkDatabaseConnection = async () => {
   return false;
 };
 
-// CORS Configuration - UPDATED
+app.use((req, res, next) => {
+  req.requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  console.log(`[${req.requestId}] ${req.method} ${req.originalUrl}`, {
+    user: req.headers.authorization ? 'authenticated' : 'anonymous',
+    timestamp: new Date().toISOString()
+  });
+  
+  const originalSend = res.json;
+  res.json = function(data) {
+    console.log(`[${req.requestId}] Response:`, {
+      statusCode: res.statusCode,
+      success: res.statusCode < 400
+    });
+    return originalSend.call(this, data);
+  };
+  
+  next();
+});
+
+// CORS Configuration - UPDATED for Render compatibility
+const allowedOrigins = [
+  'https://platform.ontrackconnect.co.za',
+  'https://platformontrackconnect.co.za',
+  'https://ontrackplatform2026-5.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:3003',
+  'http://localhost:5173',
+  'http://localhost:8080'
+];
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3002', 'http://localhost:3003', 'http://localhost:5173', 'http://localhost:8080'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      console.warn('CORS blocked origin:', origin);
+      return callback(new Error(`CORS policy: ${origin} not allowed`), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-app.use(express.json());
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  next();
+});
+
+// Security middleware
+app.use(mongoSanitize());
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
+app.use(helmet.frameguard({
+  action: "deny",
+}));
+
 app.use('/uploads', express.static('uploads'));
 
 // Serve frontend admin login as landing page if available
@@ -143,36 +204,46 @@ routes.forEach(route => {
   console.log(`✅ Route mounted: ${route.path} (${route.name})`);
 });
 
-// Basic middleware
-app.use(cors());
-app.use(express.json());
-app.use(mongoSanitize());
-app.use(helmet());
-
-app.use(
-  helmet.frameguard({
-    action: "deny",
-  })
-);
-
-app.use(
-  helmet.contentSecurityPolicy({
-    directives: {
-      defaultSrc: ["'self'"],
-      frameAncestors: ["'none'"],
-    },
-  })
-);
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'OnTrack Connect Backend API',
+    version: '1.0.0',
+    status: 'operational',
+    service: 'Ontrack Connect Platform',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: 'GET /api/health',
+      status: 'GET /api/status',
+      test: 'GET /api/test',
+      welcome: 'GET /api/welcome',
+      docs: 'See /api/health for service status'
+    }
+  });
+});
 
 // Test route with connection status
 app.get('/api/test', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
   res.json({ 
     message: 'Server is working!',
     status: 'OK',
     database: dbConnectionStatus,
     server: serverStatus,
     timestamp: new Date().toISOString()
+  });
+});
+
+// Simple test endpoint for Render
+app.get('/api/test-simple', (req, res) => {
+  res.json({ 
+    message: 'Backend API is working!',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: 'GET /api/health',
+      status: 'GET /api/status',
+      test: 'GET /api/test',
+      welcome: 'GET /api/welcome'
+    }
   });
 });
 
@@ -203,42 +274,126 @@ app.get('/api/health', async (req, res) => {
     port: PORT,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    memory: process.memoryUsage()
+    memory: process.memoryUsage(),
+    node: process.version,
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// Enhanced startup function
+// Status endpoint
+app.get('/api/status', (req, res) => {
+  const connStatus = getConnectionStatus();
+  res.json({
+    server: {
+      status: serverStatus,
+      port: PORT,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    },
+    database: {
+      status: dbConnectionStatus,
+      name: connStatus.databaseName || 'Not connected'
+    },
+    routes: routes.length,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+
+// 404 handler - AFTER all routes
+app.use('*', (req, res) => {
+  res.status(404).json({ 
+    error: 'Route not found',
+    path: req.originalUrl,
+    method: req.method,
+    availableRoutes: [
+      'GET  /api/health',
+      'GET  /api/status',
+      'GET  /api/test',
+      'GET  /api/test-simple',
+      'GET  /api/welcome',
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('🚨 Server Error:', err.stack);
+  
+  // Handle CORS errors
+  if (err.message.includes('CORS')) {
+    return res.status(403).json({ 
+      error: 'CORS Error',
+      message: err.message,
+      allowedOrigins: allowedOrigins
+    });
+  }
+  
+  res.status(err.status || 500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+  });
+});
+
+// Update the startServer function:
 const startServer = async () => {
   try {
     console.log('🚀 Starting OnTrack Connect Server...');
     console.log('='.repeat(50));
     
-    // Check database connection before starting
-    console.log('🔌 Checking database connection...');
-    const dbConnected = await checkDatabaseConnection();
+    // Initialize database FIRST
+    console.log('🔌 Initializing database connection...');
+    const dbInitialized = await initializeDatabase();
     
-    if (!dbConnected) {
-      console.warn('⚠️ Starting server without database connection');
+    if (!dbInitialized) {
+      console.warn('⚠️ Database initialization failed, but continuing...');
+    } else {
+      console.log('✅ Database initialized successfully');
     }
     
-    const server = app.listen(PORT, () => {
+    // Listen on all network interfaces (0.0.0.0) for Render compatibility
+    const server = app.listen(PORT, '0.0.0.0', () => {
       serverStatus = 'RUNNING';
       
       console.log('='.repeat(50));
       console.log(`✅ Server is running on port: ${PORT}`);
-      console.log(`📡 Database status: ${dbConnectionStatus}`);
-      console.log('='.repeat(50));
-      console.log(`🌐 Test endpoints:`);
-      console.log(`   http://localhost:${PORT}/api/test`);
-      console.log(`   http://localhost:${PORT}/api/health`);
-      console.log(`   http://localhost:${PORT}/api/welcome`);
-      console.log('='.repeat(50));
-      console.log(`📊 Total routes mounted: ${routes.length}`);
+      console.log(`🌐 Listening on: 0.0.0.0 (all interfaces)`);
       console.log('='.repeat(50));
       
-      // Log startup completion
+      // Setup database monitor AFTER server starts
+      setupDatabaseMonitor();
+      
       console.log(`🎉 OnTrack Connect Server started successfully at ${new Date().toLocaleTimeString()}`);
     });
+    
+    // Add the setupDatabaseMonitor function
+    const setupDatabaseMonitor = () => {
+      // Monitor database connection every 60 seconds
+      const monitorInterval = setInterval(async () => {
+        try {
+          const status = getConnectionStatus();
+          console.log(`📊 Database Status: ${status.connected ? 'Connected' : 'Disconnected'} - ${new Date().toLocaleTimeString()}`);
+          
+          // If not connected, try to reconnect
+          if (!status.connected) {
+            console.log('🔄 Attempting to reconnect to database...');
+            try {
+              await initializeDatabase();
+              console.log('✅ Database reconnected');
+            } catch (reconnectError) {
+              console.error('❌ Database reconnection failed:', reconnectError.message);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Database monitor error: ${error.message}`);
+        }
+      }, 60000); // Every 60 seconds
+      
+      // Store interval ID for cleanup
+      server._dbMonitorInterval = monitorInterval;
+    };
     
     // Handle server errors
     server.on('error', (error) => {
@@ -255,7 +410,15 @@ const startServer = async () => {
     process.on('SIGINT', () => {
       console.log('\n🔴 Received SIGINT. Shutting down gracefully...');
       serverStatus = 'STOPPING';
-      server.close(() => {
+      
+      // Clear database monitor interval
+      if (server._dbMonitorInterval) {
+        clearInterval(server._dbMonitorInterval);
+      }
+      
+      server.close(async () => {
+        // Close database connection
+        await closeDatabase();
         console.log('✅ Server shut down successfully');
         process.exit(0);
       });
@@ -264,7 +427,15 @@ const startServer = async () => {
     process.on('SIGTERM', () => {
       console.log('\n🔴 Received SIGTERM. Shutting down gracefully...');
       serverStatus = 'STOPPING';
-      server.close(() => {
+      
+      // Clear database monitor interval
+      if (server._dbMonitorInterval) {
+        clearInterval(server._dbMonitorInterval);
+      }
+      
+      server.close(async () => {
+        // Close database connection
+        await closeDatabase();
         console.log('✅ Server shut down successfully');
         process.exit(0);
       });
@@ -277,24 +448,6 @@ const startServer = async () => {
     process.exit(1);
   }
 };
-
-// Add a status endpoint to check server status
-app.get('/api/status', (req, res) => {
-  res.json({
-    server: {
-      status: serverStatus,
-      port: PORT,
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString()
-    },
-    database: {
-      status: dbConnectionStatus,
-      name: db?.databaseName || 'Not connected'
-    },
-    routes: routes.length,
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
 
 // Start the server
 startServer();

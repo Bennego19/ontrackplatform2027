@@ -26,13 +26,14 @@ export const authenticateToken = async (req, res, next) => {
                 userIdObj = decoded.id;
             }
 
+            const database = await db();
             // Try to find the user in students, mentors, or admins
-            let dbUser = await db.collection("students").findOne({ _id: userIdObj })
-                || await db.collection("students").findOne({ _id: decoded.id })
-                || await db.collection("mentors").findOne({ _id: userIdObj })
-                || await db.collection("mentors").findOne({ _id: decoded.id })
-                || await db.collection("admins").findOne({ _id: userIdObj })
-                || await db.collection("admins").findOne({ _id: decoded.id });
+            let dbUser = await database.collection("students").findOne({ _id: userIdObj })
+                || await database.collection("students").findOne({ _id: decoded.id })
+                || await database.collection("mentors").findOne({ _id: userIdObj })
+                || await database.collection("mentors").findOne({ _id: decoded.id })
+                || await database.collection("admins").findOne({ _id: userIdObj })
+                || await database.collection("admins").findOne({ _id: decoded.id });
 
             if (!dbUser) {
                 return res.status(404).json({ message: "User not found" });
@@ -77,9 +78,14 @@ export const authenticateAdmin = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-
+    
+    if (!decoded || !decoded.id) {
+        return res.status(403).json({ message: "Invalid token payload" });
+    }
+    
     // Verify admin exists in database - THIS IS THE KEY CHECK
-    const adminCollection = await db.collection("admins");
+    const database = await db();
+    const adminCollection = database.collection("admins");
     const admin = await adminCollection.findOne({ _id: new ObjectId(decoded.id) });
 
     if (!admin) {

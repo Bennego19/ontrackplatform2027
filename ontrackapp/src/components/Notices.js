@@ -6,14 +6,20 @@ export default function Notices() {
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [error, setError] = useState(null);
 
   const loadNotices = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const resp = await axios.get('/api/announcements');
+      const token = tokenManager.getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const resp = await axios.get('/api/announcements', { headers });
       setNotices(resp.data || []);
     } catch (err) {
       console.error('Failed to load notices', err);
+      const errorMsg = err.response?.data?.error || 'Failed to load notices';
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -27,7 +33,8 @@ export default function Notices() {
       <p>Latest announcements from OnTrack Connect</p>
       <div style={{ marginTop: 12 }}>
         {loading && <div>Loading...</div>}
-        {!loading && notices.length === 0 && <div>No notices available.</div>}
+        {error && <div style={{ color: 'red' }}>{error}</div>}
+        {!loading && !error && notices.length === 0 && <div>No notices available.</div>}
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {notices.map(n => (
             <li key={n.id} style={{ borderBottom: '1px solid #eee', padding: '12px 0' }}>

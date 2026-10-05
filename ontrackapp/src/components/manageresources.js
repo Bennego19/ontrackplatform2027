@@ -12,6 +12,7 @@ export default function ManageResources() {
     program: "",
     track: ""
   });
+  const [file, setFile] = useState(null);
 
   const [resources, setResources] = useState([]);
   const [programs, setPrograms] = useState([]);
@@ -39,7 +40,11 @@ export default function ManageResources() {
   }
 
   function handleInputChange(field, value) {
-    updateForm({ [field]: value });
+    if (field === "file") {
+      setFile(value);
+    } else {
+      updateForm({ [field]: value });
+    }
   }
 
   const showMessage = (text, type = "success") => {
@@ -55,7 +60,11 @@ export default function ManageResources() {
   // Load programs from backend
   const loadPrograms = async () => {
     try {
-      const response = await fetch("/api/programs");
+      const response = await fetch("/api/programs", {
+        headers: {
+          'Authorization': `Bearer ${tokenManager.getToken()}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setPrograms(data);
@@ -70,7 +79,11 @@ export default function ManageResources() {
   // Load tracks from backend
   const loadTracks = async () => {
     try {
-      const response = await fetch("/api/tracks");
+      const response = await fetch("/api/tracks", {
+        headers: {
+          'Authorization': `Bearer ${tokenManager.getToken()}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setTracks(data);
@@ -86,7 +99,7 @@ export default function ManageResources() {
   const isCreateFormValid =
     formData.name &&
     formData.description &&
-    formData.websiteLink &&
+    (formData.websiteLink || file) &&
     formData.program &&
     formData.track;
 
@@ -96,29 +109,30 @@ export default function ManageResources() {
     setErrors([]);
     setSuccessMessage("");
 
+    const payload = new FormData();
+    payload.append("name", formData.name.trim());
+    payload.append("description", formData.description.trim());
+    payload.append("websiteLink", formData.websiteLink.trim());
+    payload.append("program", formData.program.trim());
+    payload.append("track", formData.track.trim());
+    if (file) {
+      payload.append("document", file);
+    }
+
     try {
       const response = await fetch("/api/resources", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          description: formData.description.trim(),
-          websiteLink: formData.websiteLink.trim(),
-          program: formData.program.trim(),
-          track: formData.track.trim()
-        })
+        headers: {
+          'Authorization': `Bearer ${tokenManager.getToken()}`
+        },
+        body: payload
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        if (Array.isArray(data.errors)) {
-          setErrors(data.errors);
-        } else if (data.message) {
-          setErrors([{ field: "general", message: data.message }]);
-        } else {
-          setErrors([{ field: "general", message: "Resource creation failed. Try again." }]);
-        }
+        const errorMsg = data.error || "Resource creation failed. Try again.";
+        setErrors([{ field: "general", message: errorMsg }]);
         setLoading(false);
         return;
       }
@@ -133,6 +147,7 @@ export default function ManageResources() {
         program: "",
         track: ""
       });
+      setFile(null);
 
       // Refresh resources list
       loadResources();
@@ -147,12 +162,18 @@ export default function ManageResources() {
   // READ RESOURCES
   const loadResources = async () => {
     try {
-      const response = await fetch("/api/resources");
+      const response = await fetch("/api/resources", {
+        headers: {
+          'Authorization': `Bearer ${tokenManager.getToken()}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setResources(data);
       } else {
-        showMessage("Failed to load resources.", "error");
+        const data = await response.json();
+        const errorMsg = data.error || "Failed to load resources.";
+        showMessage(errorMsg, "error");
       }
     } catch (error) {
       showMessage("Network error loading resources.", "error");
@@ -190,10 +211,24 @@ export default function ManageResources() {
   const updateResource = async (id) => {
     try {
       const resourceData = updateFormData[id] || {};
+      const payload = new FormData();
+      
+      Object.keys(resourceData).forEach(key => {
+        if (key !== 'file') {
+          payload.append(key, resourceData[key]);
+        }
+      });
+
+      if (resourceData.file) {
+        payload.append('document', resourceData.file);
+      }
+
       const response = await fetch(`/api/resources/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(resourceData)
+        headers: {
+          'Authorization': `Bearer ${tokenManager.getToken()}`
+        },
+        body: payload
       });
 
       if (response.ok) {
@@ -201,7 +236,9 @@ export default function ManageResources() {
         loadResources();
         loadResourcesForUpdate();
       } else {
-        showMessage("Error updating resource.", "error");
+        const data = await response.json();
+        const errorMsg = data.error || "Error updating resource.";
+        showMessage(errorMsg, "error");
       }
     } catch (error) {
       showMessage("Network error updating resource.", "error");
@@ -230,7 +267,9 @@ export default function ManageResources() {
       } else if (response.status === 404) {
         showMessage("Resource not found.", "error");
       } else {
-        showMessage("Error deleting resource.", "error");
+        const data = await response.json();
+        const errorMsg = data.error || "Error deleting resource.";
+        showMessage(errorMsg, "error");
       }
     } catch (error) {
       showMessage("Network error deleting resource.", "error");
@@ -357,7 +396,7 @@ export default function ManageResources() {
 
                       <div className="form-row">
                         <div className="form-group">
-                          <label className="form-label">Website Link *</label>
+                          <label className="form-label">Website Link</label>
                           <input
                             type="url"
                             className={`form-input ${getFieldError("websiteLink") ? "error" : ""}`}
@@ -368,6 +407,18 @@ export default function ManageResources() {
                           />
                           {getFieldError("websiteLink") && (
                             <span className="error-message">{getFieldError("websiteLink")}</span>
+                          )}
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Or Upload a Document</label>
+                           <input
+                            type="file"
+                            className={`form-input ${getFieldError("file") ? "error" : ""}`}
+                            onChange={(e) => handleInputChange("file", e.target.files[0])}
+                            disabled={loading}
+                          />
+                          {getFieldError("file") && (
+                            <span className="error-message">{getFieldError("file")}</span>
                           )}
                         </div>
                       </div>
@@ -460,7 +511,7 @@ export default function ManageResources() {
                           <th>ID</th>
                           <th>Name</th>
                           <th>Description</th>
-                          <th>Website Link</th>
+                          <th>Website Link / Document</th>
                           <th>Program</th>
                           <th>Track</th>
                         </tr>
@@ -471,7 +522,10 @@ export default function ManageResources() {
                             <td>{resource._id || resource.id}</td>
                             <td>{resource.name}</td>
                             <td>{resource.description}</td>
-                            <td><a href={resource.websiteLink} target="_blank" rel="noopener noreferrer">{resource.websiteLink}</a></td>
+                            <td>
+                              {resource.websiteLink && <a href={resource.websiteLink} target="_blank" rel="noopener noreferrer">{resource.websiteLink}</a>}
+                              {resource.document && <a href={`http://localhost:3001${resource.document.relativePath}`} target="_blank" rel="noopener noreferrer">{resource.document.fileName}</a>}
+                            </td>
                             <td>{resource.program}</td>
                             <td>{resource.track}</td>
                           </tr>
@@ -502,7 +556,7 @@ export default function ManageResources() {
                           <th>ID</th>
                           <th>Name</th>
                           <th>Description</th>
-                          <th>Website Link</th>
+                          <th>Website Link / Document</th>
                           <th>Program</th>
                           <th>Track</th>
                           <th>Actions</th>
@@ -533,6 +587,11 @@ export default function ManageResources() {
                                 type="url"
                                 defaultValue={resource.websiteLink}
                                 onChange={(e) => handleUpdateChange(resource._id || resource.id, "websiteLink", e.target.value)}
+                                className="update-input"
+                              />
+                               <input
+                                type="file"
+                                onChange={(e) => handleUpdateChange(resource._id || resource.id, "file", e.target.files[0])}
                                 className="update-input"
                               />
                             </td>

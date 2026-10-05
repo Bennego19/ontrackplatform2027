@@ -35,7 +35,7 @@ export default function StudentAssignment() {
         { _id: "2", name: "Java Programming" },
         { _id: "3", name: "C# Programming" },
         { _id: "4", name: "Python Programming" },
-        { _id: "5", name: "Robotis" },
+        { _id: "5", name: "Robotics" },
         { _id: "6", name: "Compukids" },
         { _id: "7", name: "CompuTeens" },
         { _id: "8", name: "Digital Entrepreneurship" },
@@ -181,7 +181,7 @@ export default function StudentAssignment() {
               >
                 <option value="">-- Select Track --</option>
                 {tracks.map((track) => (
-                  <option key={track._id} value={track._id}>
+                  <option key={track._id} value={track.name}>
                     {track.name}
                   </option>
                 ))}

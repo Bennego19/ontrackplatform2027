@@ -9,6 +9,8 @@ var store = new ExpressBrute.MemoryStore();
 var bruteforce = new ExpressBrute(store);
 const router = express.Router();
 
+const JWT_SECRET = process.env.JWT_SECRET || 'ontrack-connect-jwt-secret-key-2024';
+
 // Add authentication middleware (SAME as in onboardstudents.mjs)
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -17,8 +19,6 @@ const authenticateToken = (req, res, next) => {
   if (!token) {
     return res.status(401).json({ message: 'Access token required' });
   }
-
-  const JWT_SECRET = 'ontrack-connect-jwt-secret-key-2024';
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
@@ -33,7 +33,8 @@ const authenticateToken = (req, res, next) => {
 router.get("/", async (req, res) => {
   res.setHeader('X-Frame-Options', 'DENY');
   try {
-    let collection = await db.collection("mentors");
+    const database = await db();
+    let collection = database.collection("mentors");
     let results = await collection.find({}).toArray();
     res.status(200).send(results);
   } catch (error) {
@@ -55,7 +56,8 @@ router.post("/onboardmentor",bruteforce.prevent, async(req, res) => {
       });
     }
 
-    const collection = await db.collection("mentors");
+    const database = await db();
+    const collection = database.collection("mentors");
 
     const newDocument = {
       name: name.trim(),
@@ -108,7 +110,8 @@ router.patch("/:id",bruteforce.prevent, authenticateToken, async (req, res) => {
       },
     };
 
-    const collection = db.collection("mentors");
+    const database = await db();
+    const collection = database.collection("mentors");
     let result = await collection.updateOne(query, updates);
 
     if (result.matchedCount === 0) {
@@ -131,7 +134,8 @@ router.patch("/:id",bruteforce.prevent, authenticateToken, async (req, res) => {
 // Delete mentor - PROTECTED
 router.delete("/:id",bruteforce.prevent, authenticateToken, async(req, res) => {
   const query = { _id: new ObjectId(req.params.id) };
-  const collection = db.collection("mentors");
+  const database = await db();
+  const collection = database.collection("mentors");
   let result = await collection.deleteOne(query);
   res.status(200).send(result);
 });
@@ -140,7 +144,8 @@ router.delete("/:id",bruteforce.prevent, authenticateToken, async(req, res) => {
 router.get("/total-mentors",bruteforce.prevent, async (req, res) => {
   res.setHeader('X-Frame-Options', 'DENY');
   try {
-    let collection = await db.collection("mentors");
+    const database = await db();
+    let collection = database.collection("mentors");
     const totalMentors = await collection.countDocuments({});
 
     res.status(200).json({
@@ -161,7 +166,8 @@ router.get("/mentors-by-track",bruteforce.prevent, async (req, res) => {
   try {
     // Try to get from mentor_assignments collection first
     try {
-      const assignmentsCollection = await db.collection("mentor_assignments");
+      const database = await db();
+      const assignmentsCollection = database.collection("mentor_assignments");
 
       // Get all active assignments
       const assignments = await assignmentsCollection.find({ status: "active" }).toArray();
@@ -189,7 +195,8 @@ router.get("/mentors-by-track",bruteforce.prevent, async (req, res) => {
 
     // Fallback: Try to get from mentors collection with track field
     try {
-      const mentorsCollection = await db.collection("mentors");
+      const database = await db();
+      const mentorsCollection = database.collection("mentors");
 
       // Check if mentors have a track field
       const mentorsWithTracks = await mentorsCollection.find({
@@ -216,7 +223,8 @@ router.get("/mentors-by-track",bruteforce.prevent, async (req, res) => {
     }
 
     // Final fallback: Distribute mentors evenly across common tracks
-    const totalMentors = await db.collection("mentors").countDocuments({});
+    const database = await db();
+    const totalMentors = await database.collection("mentors").countDocuments({});
     if (totalMentors > 0) {
       const commonTracks = ["Web Development", "Java Programming", "C# Programming", "Python Programming"];
       const mentorsPerTrack = Math.max(1, Math.floor(totalMentors / commonTracks.length));
@@ -257,7 +265,8 @@ router.post("/login",bruteforce.prevent, async (req, res) => {
       });
     }
 
-    const collection = await db.collection("mentors");
+    const database = await db();
+    const collection = database.collection("mentors");
     const mentor = await collection.findOne({ username: username.trim() });
 
     if (!mentor) {
@@ -276,7 +285,6 @@ router.post("/login",bruteforce.prevent, async (req, res) => {
     }
 
     // Generate JWT token
-    const JWT_SECRET = 'ontrack-connect-jwt-secret-key-2024';
     const token = jwt.sign(
       { 
         id: mentor._id, 

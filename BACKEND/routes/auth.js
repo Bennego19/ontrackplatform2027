@@ -64,7 +64,8 @@ router.post("/admin-login", bruteforce.prevent, async (req, res) => {
       });
     }
 
-    const collection = await db.collection("admins");
+    const database = await db();
+    const collection = database.collection("admins");
 
     // Find admin by username
     const admin = await collection.findOne({
@@ -133,8 +134,9 @@ router.post("/login", bruteforce.prevent, async (req, res) => {
       });
     }
 
+    const database = await db();
     // Try to find user in mentors collection first
-    let collection = await db.collection("students");
+    let collection = database.collection("students");
     let user = await collection.findOne({
       username: username?.trim()
     });
@@ -143,7 +145,7 @@ router.post("/login", bruteforce.prevent, async (req, res) => {
 
     // If not found in mentors, try admins
     if (!user) {
-      collection = await db.collection("admins");
+      collection = database.collection("admins");
       user = await collection.findOne({
         username: username?.trim()
       });
@@ -207,13 +209,14 @@ router.post("/verify", bruteforce.prevent, async (req, res) => {
         return res.status(401).json({ message: "Invalid or expired token" });
       }
 
+      const database = await db();
       // Find user in any collection
-      let user = await db.collection("admins").findOne({ _id: new ObjectId(decoded.id) });
+      let user = await database.collection("admins").findOne({ _id: new ObjectId(decoded.id) });
       if (!user) {
-        user = await db.collection("mentors").findOne({ _id: new ObjectId(decoded.id) });
+        user = await database.collection("mentors").findOne({ _id: new ObjectId(decoded.id) });
       }
       if (!user) {
-        user = await db.collection("students").findOne({ _id: new ObjectId(decoded.id) });
+        user = await database.collection("students").findOne({ _id: new ObjectId(decoded.id) });
       }
 
       if (!user) {
@@ -221,7 +224,7 @@ router.post("/verify", bruteforce.prevent, async (req, res) => {
       }
 
       res.json({
-        valid: true,
+        success: true,
         user: {
           id: user._id.toString(),
           username: user.username,

@@ -9,7 +9,8 @@ var store = new ExpressBrute.MemoryStore();
 var bruteforce = new ExpressBrute(store);
 // Get all mentors with their assigned students
 router.get("/",bruteforce.prevent, async (req, res) => {
-    let collection = await db.collection("mentors");
+    const database = await db();
+    let collection = database.collection("mentors");
     let results = await collection.find({}).toArray();
     res.status(200).json(results);
 });
@@ -17,7 +18,8 @@ router.get("/",bruteforce.prevent, async (req, res) => {
 // Get a specific mentor with their students
 router.get("/:id",bruteforce.prevent, async (req, res) => {
     try {
-        let collection = await db.collection("mentors");
+        const database = await db();
+        let collection = database.collection("mentors");
         let query = { _id: new ObjectId(req.params.id) };
         let result = await collection.findOne(query);
         
@@ -33,7 +35,8 @@ router.get("/:id",bruteforce.prevent, async (req, res) => {
 // Mentor signup
 router.post("/signup",bruteforce.prevent, async(req, res) => {
     try {
-        let collection = await db.collection("mentors");
+        const database = await db();
+        let collection = database.collection("mentors");
         
         // Check if mentor already exists
         const existingMentor = await collection.findOne({ 
@@ -86,7 +89,8 @@ router.post("/:mentorId/assign-student",bruteforce.prevent, async (req, res) => 
             });
         }
 
-        const mentorsCollection = await db.collection("mentors");
+        const database = await db();
+        const mentorsCollection = database.collection("mentors");
         
         // Check if mentor exists
         const mentor = await mentorsCollection.findOne({ _id: mentorId });
@@ -146,7 +150,8 @@ router.delete("/:mentorId/students/:studentId",bruteforce.prevent, async (req, r
         const mentorId = new ObjectId(req.params.mentorId);
         const studentId = req.params.studentId;
 
-        const mentorsCollection = await db.collection("mentors");
+        const database = await db();
+        const mentorsCollection = database.collection("mentors");
         
         const result = await mentorsCollection.updateOne(
             { _id: mentorId },
@@ -176,7 +181,8 @@ router.get("/:mentorId/students", async (req, res) => {
     try {
         const mentorId = new ObjectId(req.params.mentorId);
         
-        const mentorsCollection = await db.collection("mentors");
+        const database = await db();
+        const mentorsCollection = database.collection("mentors");
         const mentor = await mentorsCollection.findOne(
             { _id: mentorId },
             { projection: { students: 1, firstname: 1, lastname: 1 } }
@@ -207,7 +213,8 @@ router.patch("/:id",bruteforce.prevent,  async (req, res) => {
             }
         };
 
-        let collection = db.collection("mentors");
+        const database = await db();
+        let collection = database.collection("mentors");
         let result = await collection.updateOne(query, updates);
         
         if (result.matchedCount === 0) {
@@ -227,7 +234,8 @@ router.patch("/:id",bruteforce.prevent,  async (req, res) => {
 router.delete("/:id",bruteforce.prevent, async(req, res) => {
     try {
         const query = { _id: new ObjectId(req.params.id) };
-        const collection = db.collection("mentors");
+        const database = await db();
+        const collection = database.collection("mentors");
         let result = await collection.deleteOne(query);
 
         if (result.deletedCount === 0) {

@@ -17,7 +17,8 @@ var store = new ExpressBrute.MemoryStore();
 var bruteforce = new ExpressBrute(store);
 
 router.get("/",bruteforce.prevent, async (req,res) =>{
-    let collection = await db.collection("cohort");
+    const database = await db();
+    let collection = database.collection("cohort");
     let results = await collection.find({}).toArray();
     res.send(results).status(200);
 });
@@ -33,7 +34,8 @@ router.post("/createcohort",bruteforce.prevent, async(req,res) =>{
        startdate:req.body.startdate
     };
 
-    let collection = await db.collection("cohort");
+    const database = await db();
+    let collection = database.collection("cohort");
     let result = await collection.insertOne(newDocument);
     res.send(result).status(204);
 }
@@ -51,7 +53,8 @@ router.patch("/:id",bruteforce.prevent, async (req, res) => {
       },
     };
 
-    let collection = db.collection("cohort");
+    const database = await db();
+    let collection = database.collection("cohort");
     let result = await collection.updateOne(query, updates); 
 res.send(result).status(200);
   });
@@ -61,7 +64,8 @@ res.send(result).status(200);
   router.delete("/:id", bruteforce.prevent, async(req,res) =>{
         const query = { _id: new ObjectId(req.params.id) };
 
-        const collection = db.collection("cohort");
+        const database = await db();
+        const collection = database.collection("cohort");
         let result = await collection.deleteOne(query);
 
         res.send(result).status(200);
@@ -71,7 +75,8 @@ res.send(result).status(200);
 router.get("/total", bruteforce.prevent, async (req, res) => {
   res.setHeader('X-Frame-Options', 'DENY');
   try {
-    let collection = await db.collection("cohort");
+    const database = await db();
+    let collection = database.collection("cohort");
     const total = await collection.countDocuments({});
 
     res.status(200).json({
@@ -87,4 +92,3 @@ router.get("/total", bruteforce.prevent, async (req, res) => {
 });
 
 export default router;
-

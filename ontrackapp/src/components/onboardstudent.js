@@ -6,6 +6,7 @@ import { authAPI } from "../services/authMiddleware";
 
 export default function ManageStudents() {
   const [activeTab, setActiveTab] = useState("create");
+  // We extract form data into a single state object for easier management
   const [formData, setFormData] = useState({
     name: "",
     surname: "",
@@ -18,13 +19,20 @@ export default function ManageStudents() {
     accessAllowed: "granted"
   });
 
+  // Students list and related states
   const [students, setStudents] = useState([]);
+  // Separate state for update form data to avoid conflicts with create form
   const [updateFormData, setUpdateFormData] = useState({});
+    // Error and success message states
   const [errors, setErrors] = useState([]);
+  // Loading state for form submissions
   const [successMessage, setSuccessMessage] = useState("");
+  // Loading state for form submissions
   const [loading, setLoading] = useState(false);
+  // Search state for filtering students in read and delete tabs
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Navigation hook for potential redirects after actions
   const navigate = useNavigate();
 
   // Helper: extract field-specific errors
@@ -40,11 +48,14 @@ export default function ManageStudents() {
     if (successMessage) setSuccessMessage("");
   }
 
+  // Handle input changes for both create and update forms
   function handleInputChange(field, value) {
     updateForm({ [field]: value });
   }
 
+  // API configuration - use relative URLs in development (proxied), absolute in production
   const showMessage = (text, type = "success") => {
+    // Type can be "success" or "error"
     if (type === "success") {
       setSuccessMessage(text);
       setTimeout(() => setSuccessMessage(""), 4000);
@@ -54,6 +65,7 @@ export default function ManageStudents() {
     }
   };
 
+  // Static data for programs and tracks - in a real app, these would likely come from an API
   const programs = [
     { _id: "1", name: "Mentorship Program" },
     { _id: "2", name: "Internship Program" },
@@ -78,9 +90,10 @@ export default function ManageStudents() {
     return emailRegex.test(email);
   };
 
+  // Validate cell number
   const validateCellNumber = (cellnumber) => {
-    const cellRegex = /^[\d\-\+\(\)\s]+$/;
-    return cellRegex.test(cellnumber) && cellnumber.length >= 10;
+    const cellRegex = /^[0-9]{10}$/;
+    return cellRegex.test(cellnumber);
   };
 
   // CREATE STUDENT
@@ -96,11 +109,15 @@ export default function ManageStudents() {
     formData.username.trim() &&
     formData.password.trim();
 
+    // Handle create student form submission
+    // We use async/await for cleaner asynchronous code and better error handling
   async function handleCreateSubmit(e) {
     e.preventDefault();
     setLoading(true);
     setErrors([]);
     setSuccessMessage("");
+
+    // Validation
 
     try {
       const response = await fetch("/api/onboardstudents/onboardstudent", {
@@ -121,9 +138,12 @@ export default function ManageStudents() {
         })
       });
 
+      // We attempt to parse the response as JSON regardless of status to extract error messages
       const data = await response.json();
 
+      // Handle errors based on response status and content
       if (!response.ok) {
+        // The API might return validation errors in an "errors" array or a general message in "message"
         if (Array.isArray(data.errors)) {
           setErrors(data.errors);
         } else if (data.message) {
@@ -161,6 +181,8 @@ export default function ManageStudents() {
   }
 
   // READ STUDENTS
+  // We separate the loadStudents function for the read tab and the update tab to ensure we can manage state appropriately for each
+  
   const loadStudents = async () => {
     try {
       const response = await fetch("/api/onboardstudents", {
@@ -213,6 +235,8 @@ export default function ManageStudents() {
     }
   };
 
+  // Handle changes in the update form inputs
+  // We maintain a separate state object (updateFormData) keyed by student ID to track changes for each student being edited
   const handleUpdateChange = (id, field, value) => {
     setUpdateFormData(prev => ({
       ...prev,
@@ -220,9 +244,11 @@ export default function ManageStudents() {
         ...prev[id],
         [field]: value
       }
-    }));
+    }));  
   };
 
+ // When the user clicks "Save" for a student, we send a PATCH request with the updated data for that specific student
+ // We also handle success and error messages appropriately
   const updateStudent = async (id) => {
     try {
       const studentData = updateFormData[id] || {};
@@ -234,7 +260,7 @@ export default function ManageStudents() {
         },
         body: JSON.stringify(studentData)
       });
-
+    // We attempt to parse the response as JSON to extract any messages or errors
       if (response.ok) {
         showMessage(`✅ Student ${id} updated successfully!`);
         loadStudents();
@@ -247,12 +273,14 @@ export default function ManageStudents() {
     }
   };
 
+  // If the user clicks "Cancel" while editing a student, we simply reload the students data to reset the form inputs for that student
   const cancelEdit = (id) => {
     showMessage(`❌ Edit for Student ${id} cancelled`);
     loadStudentsForUpdate();
   };
 
   // DELETE STUDENT
+  // When the user clicks "Delete" for a student, we send a DELETE request to the API with the student's ID
   const deleteStudent = async (id, studentName) => {
     try {
       const response = await fetch(`/api/onboardstudents/${id}`, {
@@ -562,14 +590,14 @@ export default function ManageStudents() {
                         {filteredStudents.map(student => (
                           <tr key={student._id || student.id}>
                             <td>{student._id || student.id}</td>
-                            <td>{student.name}</td>
-                            <td>{student.surname}</td>
-                            <td>{student.email}</td>
-                            <td>{student.program}</td>
-                            <td>{student.track}</td>
-                            <td>{student.username}</td>
-                            <td>{student.password}</td>
-                            <td>{student.accessAllowed}</td>
+                            <td>{student.name || 'N/A'}</td>
+                            <td>{student.surname || 'N/A'}</td>
+                            <td>{student.email || 'N/A'}</td>
+                            <td>{student.program || 'N/A'}</td>
+                            <td>{student.track || 'N/A'}</td>
+                            <td>{student.username || 'N/A'}</td>
+                            <td>••••••••</td>
+                            <td>{student.accessAllowed || 'N/A'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -644,7 +672,7 @@ export default function ManageStudents() {
                             </td>
                             <td>
                               <select
-                                defaultValue={student.program}
+                                value={updateFormData[student._id || student.id]?.program || ''}
                                 onChange={(e) => handleUpdateChange(student._id || student.id, "program", e.target.value)}
                                 className="update-select"
                               >
@@ -657,7 +685,7 @@ export default function ManageStudents() {
                             </td>
                             <td>
                               <select
-                                defaultValue={student.track}
+                                value={updateFormData[student._id || student.id]?.track || ''}
                                 onChange={(e) => handleUpdateChange(student._id || student.id, "track", e.target.value)}
                                 className="update-select"
                               >
@@ -670,7 +698,7 @@ export default function ManageStudents() {
                             </td>
                             <td>
                               <select
-                                defaultValue={student.accessAllowed}
+                                value={updateFormData[student._id || student.id]?.accessAllowed || ''}
                                 onChange={(e) => handleUpdateChange(student._id || student.id, "accessAllowed", e.target.value)}
                                 className="update-select"
                               >

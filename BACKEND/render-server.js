@@ -4,14 +4,45 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import mongoSanitize from 'express-mongo-sanitize';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Import your router - ADJUST PATH AS NEEDED
-import adminLoginRouter from './routes/adminlogin.mjs';
+// Import routes
+import mentorstudentassignment from './routes/mentorstudentassignment.mjs';
+import onboardstudents from './routes/onboardstudents.mjs';
+import onboardmentors from './routes/onboardmentors.mjs';
+import programs from './routes/programs.mjs';
+import tracks from './routes/tracks.mjs';
+import assessments from './routes/assessments.mjs';
+import resources from './routes/resources.mjs';
+import events from './routes/events.mjs';
+import mentordashboard from './routes/mentordashboard.mjs';
+import cohorts from './routes/cohorts.mjs';
+import studentassignment from './routes/studentassignment.js';
+import auth from './routes/auth.js';
+import user from './routes/user.mjs';
+import addassignment from './routes/addassignment.mjs';
+import mentorship from './routes/mentorship.mjs';
+import internship from './routes/internship.mjs';
+import skillsdevelopment from './routes/skillsdevelopment.js';
+import modules from './routes/modules.mjs';
+import projects from './routes/projects.mjs';
+import announcements from './routes/announcements.mjs';
+import accesscontrol from './routes/accesscontrol.mjs';
+import adminlogin from './routes/adminlogin.mjs';
+import addtask from './routes/addtask.mjs';
+import helpRequests from './routes/help-requests.mjs';
+import db from './db/conn.mjs';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 // Security middleware
 app.use(helmet({
@@ -25,7 +56,8 @@ const allowedOrigins = [
   'https://platformontrackconnect.co.za',
   'https://ontrackplatform2026-5.onrender.com', // Your Vercel frontend
   'http://localhost:3000',
-  'http://localhost:3001'
+  'http://localhost:3001',
+  'http://localhost:5173'
 ];
 
 app.use(cors({
@@ -43,6 +75,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -56,8 +89,45 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
-app.use('/api/adminlogin', adminLoginRouter);
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('✅ Uploads directory created');
+}
+app.use('/uploads', express.static('uploads'));
+
+// Mount routes
+const routes = [
+  { path: '/api/onboardstudents', router: onboardstudents, name: 'Onboard Students' },
+  { path: '/api/onboardmentors', router: onboardmentors, name: 'Onboard Mentors' },
+  { path: '/api/mentorstudentassignment', router: mentorstudentassignment, name: 'Mentor Student Assignment' },
+  { path: '/api/mentordashboard', router: mentordashboard, name: 'Mentor Dashboard' },
+  { path: '/api/programs', router: programs, name: 'Programs' },
+  { path: '/api/tracks', router: tracks, name: 'Tracks' },
+  { path: '/api/assessments', router: assessments, name: 'Assessments' },
+  { path: '/api/resources', router: resources, name: 'Resources' },
+  { path: '/api/events', router: events, name: 'Events' },
+  { path: '/api/cohorts', router: cohorts, name: 'Cohorts' },
+  { path: '/api/studentassignment', router: studentassignment, name: 'Student Assignment' },
+  { path: '/api/auth', router: auth, name: 'Auth' },
+  { path: '/api/adminlogin', router: adminlogin, name: 'Admin Login' },
+  { path: '/api/user', router: user, name: 'User' },
+  { path: '/api/addassignment', router: addassignment, name: 'Add Assignment' },
+  { path: '/api/accesscontrol', router: accesscontrol, name: 'Access Control' },
+  { path: '/api/mentorship', router: mentorship, name: 'Mentorship' },
+  { path: '/api/internship', router: internship, name: 'Internship' },
+  { path: '/api/skillsdevelopment', router: skillsdevelopment, name: 'Skills Development' },
+  { path: '/api/modules', router: modules, name: 'Modules' },
+  { path: '/api/projects', router: projects, name: 'Projects' },
+  { path: '/api/announcements', router: announcements, name: 'Announcements' },
+  { path: '/api/addtask', router: addtask, name: 'Add Task' },
+  { path: '/api/help-requests', router: helpRequests, name: 'Help Requests' }
+];
+
+routes.forEach(route => {
+  app.use(route.path, route.router);
+});
 
 // Health check endpoint (REQUIRED for Render)
 app.get('/api/health', (req, res) => {
@@ -129,7 +199,15 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
+  // Check database connection on startup
+  try {
+    await db();
+    console.log('✅ Database connection initialized');
+  } catch (err) {
+    console.error('❌ Database connection failed:', err.message);
+  }
+
   console.log(`
   🚀 OnTrack Backend Server Started
   📡 Port: ${PORT}

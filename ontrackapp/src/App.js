@@ -1,7 +1,11 @@
-import React from 'react';
-import { Route, Routes, Navigate } from 'react-router-dom';
+// ======================
+// REFACTORED: ontrackapp/src/App.js
+// ======================
+
+import React, { useState, useEffect } from 'react';
+import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import SignUp from "./components/signup";
-import Login from "./components/Login"; // New login page
+import Login from "./components/Login";
 import Dashboard from './components/dashboard';
 import CreateMentor from './components/creatementor';
 import Createassessment from './components/createassessment';
@@ -20,30 +24,56 @@ import AdminAnnouncements from './components/AdminAnnouncements';
 import Notices from './components/Notices';
 import Events from './components/events';
 import HelpRequests from './components/HelpRequests';
+import { authAPI, tokenManager } from './services/authMiddleware';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
-  const token = localStorage.getItem('authToken');
-  const storedUser = localStorage.getItem('user');
-  let username = null;
-
-  if (storedUser) {
-    try {
-      const userData = JSON.parse(storedUser);
-      username = userData.username;
-    } catch (e) {
-      console.error('Error parsing stored user data:', e);
-    }
+  const navigate = useNavigate();
+  const [authStatus, setAuthStatus] = useState('checking');
+  
+  useEffect(() => {
+    const verifyAuth = async () => {
+      try {
+        // Use the correct verify endpoint
+        const response = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tokenManager.getToken()}`
+          },
+          body: JSON.stringify({ token: tokenManager.getToken() })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          tokenManager.clearAuth();
+          navigate('/');
+          return;
+        }
+        
+        const user = data.user;
+        
+        if (requireAdmin && user?.role?.toLowerCase() !== 'admin') {
+          navigate('/userdashboard');
+          return;
+        }
+        
+        setAuthStatus('authenticated');
+      } catch (error) {
+        console.error('Auth verification error:', error);
+        tokenManager.clearAuth();
+        navigate('/');
+      }
+    };
+    
+    verifyAuth();
+  }, [navigate, requireAdmin]);
+  
+  if (authStatus === 'checking') {
+    return <div>Loading...</div>;
   }
-
-  if (!token) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (requireAdmin && username?.toLowerCase() !== 'admin') {
-    return <Navigate to="/userdashboard" replace />;
-  }
-
+  
   return children;
 };
 

@@ -41,19 +41,20 @@ const JWT_SECRET = process.env.JWT_SECRET || 'ontrack-connect-jwt-secret-key-202
 
 router.get("/debug-passwords", async (req, res) => {
   try {
-    const collection = db.collection("admins");
+    const database = await db();
+    const collection = database.collection("admins");
     const admins = await collection.find({}).toArray();
     
-    // This shows passwords in plain text - DANGEROUS!
+    // Security fix: Don't show passwords
     const adminsWithPasswords = admins.map(admin => ({
       username: admin.username,
-      password: admin.password, // ⚠️ PLAIN TEXT PASSWORD
       role: admin.role,
-      _id: admin._id
+      _id: admin._id,
+      hasPassword: !!admin.password
     }));
     
     res.json({
-      warning: "⚠️ SECURITY RISK: Passwords are visible!",
+      warning: "⚠️ SECURITY NOTICE: Passwords are hidden for security.",
       admins: adminsWithPasswords
     });
   } catch (error) {
@@ -109,7 +110,8 @@ router.post("/admins", async (req, res) => {
       });
     }
     
-    const collection = db.collection("admins");
+    const database = await db();
+    const collection = database.collection("admins");
     
     // Check if username already exists
     const existingAdmin = await collection.findOne({ username: username.trim() });
@@ -120,10 +122,14 @@ router.post("/admins", async (req, res) => {
       });
     }
     
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
     // Create admin document
     const newAdmin = {
       username: username.trim(),
-      password: password, // WARNING: Plain text - hash in production!
+      password: hashedPassword, // Securely hashed
       name: name || username,
       email: email || `${username}@ontrack.com`,
       role: role || "admin",
@@ -159,7 +165,8 @@ router.post("/admins", async (req, res) => {
 // Quick test route to create a test admin
 router.post("/create-test-admin", async (req, res) => {
   try {
-    const collection = db.collection("admins");
+    const database = await db();
+    const collection = database.collection("admins");
     
     // Check if test admin already exists
     const existingAdmin = await collection.findOne({ username: "testadmin" });
@@ -174,10 +181,14 @@ router.post("/create-test-admin", async (req, res) => {
       });
     }
     
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash("test123", salt);
+
     // Create test admin
     const testAdmin = {
       username: "testadmin",
-      password: "test123",
+      password: hashedPassword,
       name: "Test Administrator",
       email: "test@ontrack.com",
       role: "admin",
@@ -193,7 +204,6 @@ router.post("/create-test-admin", async (req, res) => {
       message: "Test admin created successfully",
       admin: {
         username: testAdmin.username,
-        password: testAdmin.password,
         id: result.insertedId
       },
       note: "Use username: testadmin, password: test123 to login"
@@ -212,7 +222,8 @@ router.post("/create-test-admin", async (req, res) => {
 // Quick route to add multiple sample admins
 router.post("/create-sample-admins", async (req, res) => {
   try {
-    const collection = db.collection("admins");
+    const database = await db();
+    const collection = database.collection("admins");
     
     const sampleAdmins = [
       {
@@ -242,8 +253,12 @@ router.post("/create-sample-admins", async (req, res) => {
       const existing = await collection.findOne({ username: adminData.username });
       
       if (!existing) {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(adminData.password, salt);
+
         const newAdmin = {
           ...adminData,
+          password: hashedPassword,
           email: `${adminData.username}@ontrack.com`,
           createdAt: new Date(),
           lastLogin: null,
@@ -253,7 +268,6 @@ router.post("/create-sample-admins", async (req, res) => {
         const result = await collection.insertOne(newAdmin);
         results.push({
           username: adminData.username,
-          password: adminData.password,
           id: result.insertedId,
           status: "created"
         });
@@ -288,7 +302,8 @@ router.get("/admins", async (req, res) => {
   try {
     console.log("Fetching all admins request received");
     
-    const collection = db.collection("admins");
+    const database = await db();
+    const collection = database.collection("admins");
     
     // Get query parameters
     const { page, limit, search, role } = req.query;
@@ -363,7 +378,8 @@ router.get("/admins/:id", async (req, res) => {
       });
     }
     
-    const collection = db.collection("admins");
+    const database = await db();
+    const collection = database.collection("admins");
     const admin = await collection.findOne({ _id: new ObjectId(id) });
     
     if (!admin) {
@@ -415,7 +431,7 @@ router.post("/adminlogin", bruteforce.prevent, async (req, res) => {
       });
     }
 
-    const collection = await database.collection("admins");
+    const collection = database.collection("admins");
 
     // Find admin by username
     const admin = await collection.findOne({
@@ -431,8 +447,25 @@ router.post("/adminlogin", bruteforce.prevent, async (req, res) => {
       });
     }
 
-    // Plain text password check
-    if (password !== admin.password) {
+    // Password check (supports migration from plain text to bcrypt)
+    let isMatch = false;
+    const isHash = admin.password && (admin.password.startsWith('$2a$') || admin.password.startsWith('$2b$'));
+
+    if (isHash) {
+      isMatch = await bcrypt.compare(password, admin.password);
+    } else {
+      // Legacy plain text check
+      if (password === admin.password) {
+        isMatch = true;
+        // Migrate to hash automatically
+        console.log(`Migrating admin ${username} to hashed password`);
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+        await collection.updateOne({ _id: admin._id }, { $set: { password: hashedPassword } });
+      }
+    }
+
+    if (!isMatch) {
       console.log("Invalid admin password");
       return res.status(401).json({ message: "Invalid credentials" });
     }
@@ -463,8 +496,7 @@ router.post("/adminlogin", bruteforce.prevent, async (req, res) => {
         id: admin._id.toString(),
         username: admin.username,
         role: admin.role,
-        name: admin.name,
-        password: admin.password
+        name: admin.name
       }
     });
 
@@ -483,7 +515,8 @@ router.get("/check-admin/:username", async (req, res) => {
   try {
     const { username } = req.params;
     
-    const collection = db.collection("admins");
+    const database = await db();
+    const collection = database.collection("admins");
     const admin = await collection.findOne({
       username: username?.trim()
     });
@@ -533,8 +566,6 @@ router.get("/debug-db", async (req, res) => {
   }
 });
 
-export default router;
-
 // Verify token route (returns user info when token is valid)
 // Note: This exposes a simple verification endpoint for frontend checks.
 router.get('/verify', async (req, res) => {
@@ -547,19 +578,67 @@ router.get('/verify', async (req, res) => {
     const parts = authHeader.split(' ');
     const token = parts.length === 2 ? parts[1] : authHeader;
 
-    const payload = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const database = await db();
+    const admin = await database.collection("admins").findOne({ _id: new ObjectId(decoded.id) });
+
+    if (!admin) {
+      return res.status(401).json({ success: false, message: 'User not found or invalid token' });
+    }
 
     // Return minimal user info
     return res.json({
       success: true,
       user: {
-        id: payload.id,
-        username: payload.username,
-        role: payload.role
+        id: admin._id.toString(),
+        username: admin.username,
+        role: admin.role,
+        name: admin.name
       }
     });
   } catch (err) {
     console.error('Token verify error:', err && err.message ? err.message : err);
+    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+  }
+});
+
+// Add POST support for verify to handle different frontend implementations
+router.post('/verify', async (req, res) => {
+  try {
+    let token = req.body.token;
+    
+    // If not in body, check header
+    if (!token) {
+      const authHeader = req.headers.authorization || req.headers.Authorization;
+      if (authHeader) {
+        token = authHeader.split(' ')[1];
+      }
+    }
+
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const database = await db();
+    const admin = await database.collection("admins").findOne({ _id: new ObjectId(decoded.id) });
+
+    if (!admin) {
+      return res.status(401).json({ success: false, message: 'User not found or invalid token' });
+    }
+
+    return res.json({
+      success: true,
+      user: {
+        id: admin._id.toString(),
+        username: admin.username,
+        role: admin.role,
+        name: admin.name
+      }
+    });
+  } catch (err) {
+    console.error('Token verify error:', err.message);
     return res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 });
@@ -576,7 +655,8 @@ router.post("/bulk-create-admins", async (req, res) => {
       });
     }
     
-    const collection = db.collection("admins");
+    const database = await db();
+    const collection = database.collection("admins");
     const results = [];
     const errors = [];
     
@@ -605,10 +685,14 @@ router.post("/bulk-create-admins", async (req, res) => {
           continue;
         }
         
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(adminData.password, salt);
+
         // Create new admin
         const newAdmin = {
           username: adminData.username.trim(),
-          password: adminData.password,
+          password: hashedPassword,
           name: adminData.name || adminData.username,
           email: adminData.email || `${adminData.username}@ontrack.com`,
           role: adminData.role || "admin",
@@ -656,3 +740,5 @@ router.post("/bulk-create-admins", async (req, res) => {
     });
   }
 });
+
+export default router;
