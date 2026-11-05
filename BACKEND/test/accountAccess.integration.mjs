@@ -79,8 +79,12 @@ test('deactivation revokes sessions while retaining related records', async () =
     assert.equal((await call('/api/onboardstudents/profile', 'GET', undefined, newStudent.body.token)).status, 403);
     newStudent = await call('/api/onboardstudents/login', 'POST', { username: 'accessstudent', password });
     assert.equal(newStudent.status, 200);
+    const mentorReset = await call(`/api/password-reset/issue/mentor/${mentor.insertedId}`, 'POST', {}, adminToken);
+    assert.equal(mentorReset.status, 200);
     assert.equal((await call(`/api/onboardmentors/${mentor.insertedId}/access`, 'PATCH', { active: false }, adminToken)).status, 200);
     assert.equal((await call('/api/mentordashboard/profile', 'GET', undefined, mentorToken)).status, 403);
+    assert.equal((await call('/api/password-reset/redeem', 'POST', { token: mentorReset.body.token, password })).status, 400);
+    assert.equal((await call(`/api/password-reset/issue/mentor/${mentor.insertedId}`, 'POST', {}, adminToken)).status, 404);
     assert.equal((await call('/api/mentorstudentassignment/active-count', 'GET', undefined, adminToken)).body.count, 0);
     assert.equal((await call('/api/mentorstudentassignment/student', 'GET', undefined, newStudent.body.token)).body.assignments.length, 0);
     const inactiveMentorAssignment = await call('/api/mentorstudentassignment/student', 'POST', { mentorIds: [mentor.insertedId], studentIds: [student.insertedId] }, adminToken);
