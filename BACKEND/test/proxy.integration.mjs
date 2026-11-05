@@ -45,6 +45,12 @@ test('frontend proxy reaches login and preserves programme and track access', as
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     assert.equal(health.status, 200);
+    const directPage = await fetch(`${base}/userdashboard`);
+    assert.equal(directPage.status, 200);
+    assert.match(await directPage.text(), /<div id="root"><\/div>/);
+    const missingApi = await fetch(`${base}/api/missing-test-route`);
+    assert.equal(missingApi.status, 404);
+    assert.match(missingApi.headers.get('content-type'), /application\/json/);
     const call = async (url, method, body, token) => {
       const response = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
       return { status: response.status, body: await response.json() };
