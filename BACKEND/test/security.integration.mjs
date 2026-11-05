@@ -157,6 +157,7 @@ test('student credentials and privileged routes', async () => {
     assert.equal((await request('/api/events', { method: 'POST', headers: studentHeaders, body: '{}' })).status, 403);
     assert.equal((await request('/api/projects', { method: 'POST', headers: studentHeaders, body: '{}' })).status, 403);
     assert.equal((await request('/api/assessments', { method: 'POST', headers: studentHeaders, body: '{}' })).status, 403);
+    assert.equal((await request('/api/assessments', { method: 'POST', headers: adminHeaders, body: '{}' })).status, 400);
     assert.equal((await request('/api/studentassignment', { headers: studentHeaders })).status, 403);
     assert.equal((await request('/api/mentordashboard/assigned-students', { headers: studentHeaders })).status, 403);
     assert.equal((await request('/api/addtask/507f1f77bcf86cd799439011', { method: 'DELETE', headers: studentHeaders })).status, 403);
@@ -168,6 +169,8 @@ test('student credentials and privileged routes', async () => {
     const assessmentResponse = await fetch(`${base}/api/assessments`, { method: 'POST', headers: adminHeaders, body: assessmentForm });
     assert.equal(assessmentResponse.status, 201);
     const assessment = await assessmentResponse.json();
+    assert.equal((await request(`/api/assessments/${assessment.id}`, { method: 'PATCH', headers: adminHeaders, body: JSON.stringify({ program: null }) })).status, 400);
+    assert.equal((await request(`/api/assessments/${assessment.id}`, { method: 'PATCH', headers: adminHeaders, body: JSON.stringify({ track: {} }) })).status, 400);
     const taskList = await request('/api/assessments/tasks', { headers: studentHeaders });
     const savedAssessment = taskList.body.find(item => item._id === assessment.id);
     assert.ok(savedAssessment);

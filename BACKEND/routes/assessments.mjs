@@ -46,6 +46,15 @@ const userTypeQuery = (type, user) => ({
     assessmenttype: { $regex: new RegExp(`^${type}$`, "i") },
     ...visibility(user)
 });
+const assessmentFields = ['assessmentname', 'assessmenttype', 'program', 'track', 'dateadded', 'datedue'];
+
+function validAssessmentFields(body, partial = false) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
+    return assessmentFields.every(field => {
+        if (partial && body[field] === undefined) return true;
+        return typeof body[field] === 'string' && body[field].trim().length > 0 && body[field].length <= 1000;
+    });
+}
 
 /* ========================= CRUD ========================= */
 
@@ -66,15 +75,16 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 router.post("/", authenticateToken, files.parseDocument, async (req, res) => {
+    if (!validAssessmentFields(req.body)) return res.status(400).json({ message: 'All assessment fields must contain valid text' });
     let uploaded;
     try {
         const doc = {
-            assessmentname: req.body.assessmentname,
-            assessmenttype: req.body.assessmenttype?.toLowerCase(),
-            program: req.body.program,
-            track: req.body.track,
-            dateadded: req.body.dateadded,
-            datedue: req.body.datedue,
+            assessmentname: req.body.assessmentname.trim(),
+            assessmenttype: req.body.assessmenttype.trim().toLowerCase(),
+            program: req.body.program.trim(),
+            track: req.body.track.trim(),
+            dateadded: req.body.dateadded.trim(),
+            datedue: req.body.datedue.trim(),
             createdAt: new Date()
         };
 
@@ -92,6 +102,7 @@ router.post("/", authenticateToken, files.parseDocument, async (req, res) => {
 });
 
 router.patch("/:id", authenticateToken, files.parseDocument, async (req, res) => {
+    if (!validAssessmentFields(req.body, true)) return res.status(400).json({ message: 'Invalid assessment fields' });
     let uploaded;
     try {
         if (!ObjectId.isValid(req.params.id)) {
@@ -103,20 +114,6 @@ router.patch("/:id", authenticateToken, files.parseDocument, async (req, res) =>
 
         if (!current) {
             return res.status(404).json({ error: "Assessment not found" });
-        }
-
-        const requiredFields = ['assessmentname', 'assessmenttype', 'program', 'track', 'dateadded', 'datedue'];
-        const validationErrors = [];
-
-        requiredFields.forEach(field => {
-            if (req.body[field] !== undefined && req.body[field] !== null &&
-                (typeof req.body[field] === 'string' && req.body[field].trim() === '')) {
-                validationErrors.push(`${field} cannot be blank`);
-            }
-        });
-
-        if (validationErrors.length > 0) {
-            return res.status(400).json({ message: "Validation failed", errors: validationErrors });
         }
 
         const update = { updatedAt: new Date() };
