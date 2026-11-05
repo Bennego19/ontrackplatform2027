@@ -20,6 +20,7 @@ import mongoSanitize from "express-mongo-sanitize";
 import { getDatabase, getConnectionStatus, initializeDatabase, closeDatabase } from './db/conn.mjs';
 import { allowedCorsOrigins } from './utils/corsOrigins.mjs';
 import { logError } from './utils/logError.mjs';
+import { authenticateAdmin } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,33 +39,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Add connection status tracking
-let dbConnectionStatus = 'DISCONNECTED';
 let serverStatus = 'STOPPED';
-
-// Function to check database connection
-const checkDatabaseConnection = async () => {
-  try {
-    const dbInstance = await getDatabase(); // Corrected: use getDatabase
-    if (dbInstance) {
-      // Try to ping the database
-      const adminDb = dbInstance.admin();
-      const pingResult = await adminDb.ping();
-      
-      if (pingResult && pingResult.ok === 1) {
-        dbConnectionStatus = 'CONNECTED';
-        console.log('✅ Database connection: CONNECTED');
-        console.log(`📊 Database name: ${dbInstance.databaseName}`);
-        
-        return true;
-      }
-    }
-  } catch (error) {
-    dbConnectionStatus = 'ERROR';
-    logError('Database connection error:', error);
-    return false;
-  }
-  return false;
-};
 
 app.use((req, res, next) => {
   req.requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -212,35 +187,11 @@ app.get('/api/test-simple', (req, res) => res.status(404).json({ error: 'Route n
 
 // Welcome route with logging
 app.get('/api/welcome', (req, res) => {
-  res.json({ 
-    message: 'Welcome to the API Service!',
-    status: {
-      server: 'Running',
-      database: dbConnectionStatus,
-      port: PORT
-    },
-    serverTime: new Date().toISOString(),
-    endpoints: routes.map(r => r.path)
-  });
+  res.json({ message: 'Welcome to the API Service!' });
 });
 
-// Health check endpoint with detailed status
-app.get('/api/health', async (req, res) => {
-  const dbHealthy = await checkDatabaseConnection();
-  
-  res.json({
-    status: dbHealthy ? 'HEALTHY' : 'UNHEALTHY',
-    server: serverStatus,
-    database: dbConnectionStatus,
-    databaseHealthy: dbHealthy,
-    port: PORT,
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    memory: process.memoryUsage(),
-    node: process.version,
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
+// Process liveness is separate from the database readiness check.
+app.get('/api/health', (req, res) => res.json({ status: 'healthy' }));
 
 // Status endpoint
 app.get('/api/ready', async (req, res) => {
@@ -252,7 +203,7 @@ app.get('/api/ready', async (req, res) => {
   }
 });
 
-app.get('/api/status', (req, res) => {
+app.get('/api/status', authenticateAdmin, (req, res) => {
   const connStatus = getConnectionStatus();
   res.json({
     server: {
@@ -262,7 +213,7 @@ app.get('/api/status', (req, res) => {
       timestamp: new Date().toISOString()
     },
     database: {
-      status: dbConnectionStatus,
+      status: connStatus.connected ? 'CONNECTED' : 'DISCONNECTED',
       name: connStatus.databaseName || 'Not connected'
     },
     routes: routes.length,

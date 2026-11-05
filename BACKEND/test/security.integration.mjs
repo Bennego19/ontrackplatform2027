@@ -558,6 +558,9 @@ test('student credentials and privileged routes', async () => {
       assert.equal(corsResponse.status, 403);
       assert.deepEqual(await corsResponse.json(), { error: 'CORS Error' });
       assert.equal((await fetch(`${alternateBase}/api/welcome`)).status, 200);
+      assert.deepEqual(await (await fetch(`${alternateBase}/api/health`)).json(), { status: 'healthy' });
+      assert.equal((await fetch(`${alternateBase}/api/status`)).status, 401);
+      assert.equal((await fetch(`${alternateBase}/api/status`, { headers: { Authorization: `Bearer ${replacementAdminToken}` } })).status, 200);
       await new Promise(resolve => setTimeout(resolve, 100));
       assert.doesNotMatch(alternateLogs, /private-student@example\.test|private-token|private-origin\.example\.test/);
     } finally { alternate.kill(); }
