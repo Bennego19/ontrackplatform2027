@@ -68,7 +68,7 @@ router.get("/", authenticateToken, async (req, res) => {
         if (req.userType !== 'admins') Object.assign(query, visibility(req.dbUser));
 
         const results = await req.db.collection("assessments").find(query).toArray();
-        res.json(results);
+        res.json(results.map(item => ({ ...item, documentLink: item.document?.relativePath || null })));
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch assessments" });
     }

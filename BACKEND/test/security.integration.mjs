@@ -175,6 +175,8 @@ test('student credentials and privileged routes', async () => {
     const savedAssessment = taskList.body.find(item => item._id === assessment.id);
     assert.ok(savedAssessment);
     const filePath = savedAssessment.documentLink;
+    const assessmentList = await request('/api/assessments', { headers: studentHeaders });
+    assert.equal(assessmentList.body.find(item => item._id === assessment.id).documentLink, filePath);
     // A general flag must not override an explicit programme and track.
     await db.collection('assessments').updateOne({ _id: new ObjectId(assessment.id) }, { $set: { isGeneral: true } });
     assert.equal((await request(filePath)).status, 401);
