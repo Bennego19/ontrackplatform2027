@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/authMiddleware';
 import { tokenManager } from '../services/authMiddleware';
+import { mentorAuthAPI } from '../services/mentorAuthMiddleware';
 import './Dashboard.css'; // Reuse the CSS
 
 const Login = () => {
@@ -25,6 +26,8 @@ const Login = () => {
       let response;
       if (activeTab === 'admin') {
         response = await authAPI.adminLogin(credentials.username, credentials.password);
+      } else if (activeTab === 'mentor') {
+        response = await mentorAuthAPI.login(credentials.username, credentials.password);
       } else {
         response = await authAPI.login(credentials.username, credentials.password);
       }
@@ -34,7 +37,9 @@ const Login = () => {
         tokenManager.setStoredUser(response.user);
 
         // Redirect based on role
-        if (response.user.role === 'admin' || response.user.role === 'superadmin') {
+        if (activeTab === 'mentor') {
+          navigate('/mentordashboard');
+        } else if (response.user.role === 'admin' || response.user.role === 'superadmin') {
           navigate('/dashboard');
         } else {
           navigate('/userdashboard');
@@ -44,7 +49,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      setLoginError('Login failed. Please try again.');
+      setLoginError(error.message || 'Login failed. Please try again.');
     } finally {
       setIsLoggingIn(false);
     }
@@ -78,12 +83,18 @@ const Login = () => {
           >
             Student Login
           </button>
+          <button
+            className={`tab-button ${activeTab === 'mentor' ? 'active' : ''}`}
+            onClick={() => setActiveTab('mentor')}
+          >
+            Mentor Login
+          </button>
         </div>
 
         <form onSubmit={handleLogin} className="login-form">
           {loginError && <div className="error-message">{loginError}</div>}
           
-          <h3>{activeTab === 'admin' ? 'Admin Login' : 'Student Login'}</h3>
+          <h3>{activeTab === 'admin' ? 'Admin' : activeTab === 'mentor' ? 'Mentor' : 'Student'} Login</h3>
           
           <div className="form-group">
             <label htmlFor="username">Username</label>
@@ -118,7 +129,7 @@ const Login = () => {
             className="login-btn"
             disabled={isLoggingIn}
           >
-            {isLoggingIn ? 'Logging in...' : `Login as ${activeTab === 'admin' ? 'Admin' : 'Student'}`}
+            {isLoggingIn ? 'Logging in...' : `Login as ${activeTab === 'admin' ? 'Admin' : activeTab === 'mentor' ? 'Mentor' : 'Student'}`}
           </button>
 
       

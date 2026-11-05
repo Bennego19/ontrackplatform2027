@@ -1,3 +1,4 @@
+import { logError } from '../utils/logError.mjs';
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import db from "../db/conn.mjs";
@@ -27,24 +28,38 @@ export const authenticateToken = async (req, res, next) => {
             }
 
             const database = await db();
-            // Try to find the user in students, mentors, or admins
-            let dbUser = await database.collection("students").findOne({ _id: userIdObj })
-                || await database.collection("students").findOne({ _id: decoded.id })
-                || await database.collection("mentors").findOne({ _id: userIdObj })
-                || await database.collection("mentors").findOne({ _id: decoded.id })
-                || await database.collection("admins").findOne({ _id: userIdObj })
-                || await database.collection("admins").findOne({ _id: decoded.id });
+            let dbUser;
+            let userType;
+            const accountType = decoded.role === 'mentor' ? 'mentors'
+                : ['admin', 'superadmin'].includes(decoded.role) ? 'admins'
+                : (!decoded.role || decoded.role === 'student') ? 'students' : null;
+            if (!accountType) return res.status(403).json({ message: 'Invalid account role' });
+            for (const type of [accountType]) {
+                dbUser = await database.collection(type).findOne({ _id: userIdObj })
+                    || await database.collection(type).findOne({ _id: decoded.id });
+                if (dbUser) { userType = type; break; }
+            }
 
             if (!dbUser) {
                 return res.status(404).json({ message: "User not found" });
+            }
+            if ((userType === 'students' && dbUser.accessAllowed !== 'granted') || dbUser.isActive === false || (userType === 'mentors' && dbUser.accessAllowed === 'denied')) {
+                return res.status(403).json({ message: 'Account access denied', accessDenied: true });
+            }
+            if (userType === 'admins' && (dbUser.role || 'admin') !== decoded.role) {
+                return res.status(403).json({ message: 'Session expired', accessDenied: true });
+            }
+            if ((decoded.tokenVersion || 0) !== (dbUser.tokenVersion || 0)) {
+                return res.status(403).json({ message: 'Session expired', accessDenied: true });
             }
 
             // Attach both decoded token and db user record for downstream handlers
             req.user = decoded; // token payload
             req.dbUser = dbUser; // database record (student/mentor/admin)
+            req.userType = userType;
             next();
         } catch (error) {
-            console.error("Auth error:", error);
+            logError("Auth error:", error);
             res.status(500).json({ message: "Internal server error" });
         }
     });
@@ -79,7 +94,7 @@ export const authenticateAdmin = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    if (!decoded || !decoded.id) {
+    if (!decoded || !decoded.id || !['admin', 'superadmin'].includes(decoded.role) || !ObjectId.isValid(decoded.id)) {
         return res.status(403).json({ message: "Invalid token payload" });
     }
     
@@ -93,15 +108,18 @@ export const authenticateAdmin = async (req, res, next) => {
     }
 
     // Optional: Check if admin is active
-    if (admin.isActive === false) {
+    if (admin.isActive === false || (admin.role || 'admin') !== decoded.role) {
       return res.status(403).json({ message: "Admin account is inactive" });
+    }
+    if ((decoded.tokenVersion || 0) !== (admin.tokenVersion || 0)) {
+      return res.status(403).json({ message: 'Session expired' });
     }
 
     req.admin = decoded;
     req.adminUser = admin;
     next();
   } catch (error) {
-    console.error("Admin authentication error:", error.message);
+    logError("Admin authentication error:", error);
 
     if (error.name === "JsonWebTokenError") {
       return res.status(403).json({ message: "Invalid admin token" });
@@ -110,9 +128,6 @@ export const authenticateAdmin = async (req, res, next) => {
       return res.status(403).json({ message: "Admin token expired" });
     }
 
-    res.status(500).json({
-      message: "Admin authentication failed",
-      error: error.message
-    });
+    res.status(500).json({ message: "Admin authentication failed" });
   }
 };

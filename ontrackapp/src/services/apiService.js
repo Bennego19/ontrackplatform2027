@@ -8,7 +8,7 @@ import { tokenManager } from './authMiddleware';
 // Create axios instance with default configuration
 // Note: No baseURL set - using relative URLs which work with proxy in dev
 export const apiClient = axios.create({
-  timeout: 10000,
+  timeout: 70000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -24,27 +24,23 @@ apiClient.interceptors.request.use(
     
     // Add authorization token
     const token = tokenManager.getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    try {
+      const base = new URL(config.baseURL || '/', window.location.origin);
+      const url = new URL(config.url, base);
+      if (token && url.origin === window.location.origin && (url.pathname === '/api' || url.pathname.startsWith('/api/')) && !config.headers.Authorization) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch { /* Do not attach credentials to an invalid URL. */ }
     
-    console.log(`📤 ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor - handles errors and logging
+// Response interceptor - handles expired sessions without logging request data.
 apiClient.interceptors.response.use(
-  (response) => {
-    const duration = Date.now() - response.config.metadata?.startTime;
-    console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${duration}ms`);
-    return response;
-  },
+  (response) => response,
   (error) => {
-    const duration = Date.now() - (error.config?.metadata?.startTime || Date.now());
-    console.error(`❌ ${error.config?.method?.toUpperCase() || 'REQUEST'} ${error.config?.url || 'unknown'} - ${duration}ms`);
-    
     // Handle 401 - redirect to login
     if (error.response?.status === 401) {
       tokenManager.clearAuth();
@@ -61,7 +57,7 @@ export const fetchWithRetry = async (url, options = {}, retries = 3) => {
     try {
       const response = await apiClient.get(url, {
         ...options,
-        timeout: 10000,
+        timeout: 70000,
       });
 
       if (response.status < 200 || response.status >= 300) {
@@ -70,7 +66,7 @@ export const fetchWithRetry = async (url, options = {}, retries = 3) => {
 
       return response.data;
     } catch (error) {
-      if (i === retries - 1) throw error;
+      if (i === retries - 1 || axios.isCancel(error) || options.signal?.aborted || (error.response && error.response.status < 500)) throw error;
       // Exponential backoff: wait 1s, 2s, 4s
       await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
     }
@@ -84,7 +80,7 @@ export const axiosWithRetry = async (axiosConfig, retries = 3) => {
       const response = await apiClient(axiosConfig);
       return response.data;
     } catch (error) {
-      if (i === retries - 1) throw error;
+      if (i === retries - 1 || axios.isCancel(error) || axiosConfig.signal?.aborted) throw error;
       // Only retry on network errors or 5xx server errors
       if (!error.response || error.response.status >= 500) {
         await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));

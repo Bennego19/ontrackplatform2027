@@ -2,32 +2,34 @@
 // REFACTORED: ontrackapp/src/App.js
 // ======================
 
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
-import SignUp from "./components/signup";
-import Login from "./components/Login";
-import Dashboard from './components/dashboard';
-import CreateMentor from './components/creatementor';
-import Createassessment from './components/createassessment';
-import StudentAssignment from './components/studentassignment';
-import OnboardStudent from './components/onboardstudent';
-import OnboardMentor from './components/onboardmentor';
-import AssignMentor from './components/mentorassignment';
-import Managementorship from './components/managementorship';
-import ManageInternship from './components/manageinternship';
-import ManageSkillDevelopment from './components/manageskilldevelopment';
-import ManageGraduate from './components/managegraduate';
-import Userdashboard from './components/userdashboard';
-import MentorDashboard from './components/mentordashboard';
-import ManageResources from './components/manageresources';
-import AdminAnnouncements from './components/AdminAnnouncements';
-import Notices from './components/Notices';
-import Events from './components/events';
-import HelpRequests from './components/HelpRequests';
-import { authAPI, tokenManager } from './services/authMiddleware';
+import Login from './components/Login';
+import { tokenManager } from './services/authMiddleware';
+
+const SignUp = lazy(() => import('./components/signup'));
+const ResetPassword = lazy(() => import('./components/ResetPassword'));
+const Dashboard = lazy(() => import('./components/dashboard'));
+const CreateMentor = lazy(() => import('./components/creatementor'));
+const Createassessment = lazy(() => import('./components/createassessment'));
+const StudentAssignment = lazy(() => import('./components/studentassignment'));
+const OnboardStudent = lazy(() => import('./components/onboardstudent'));
+const OnboardMentor = lazy(() => import('./components/onboardmentor'));
+const AssignMentor = lazy(() => import('./components/mentorassignment'));
+const Managementorship = lazy(() => import('./components/managementorship'));
+const ManageInternship = lazy(() => import('./components/manageinternship'));
+const ManageSkillDevelopment = lazy(() => import('./components/manageskilldevelopment'));
+const ManageGraduate = lazy(() => import('./components/managegraduate'));
+const Userdashboard = lazy(() => import('./components/userdashboard'));
+const MentorDashboard = lazy(() => import('./components/mentordashboard'));
+const ManageResources = lazy(() => import('./components/manageresources'));
+const AdminAnnouncements = lazy(() => import('./components/AdminAnnouncements'));
+const Notices = lazy(() => import('./components/Notices'));
+const Events = lazy(() => import('./components/events'));
+const HelpRequests = lazy(() => import('./components/HelpRequests'));
 
 // Protected Route Component
-const ProtectedRoute = ({ children, requireAdmin = false }) => {
+const ProtectedRoute = ({ children, requireAdmin = false, requireMentor = false }) => {
   const navigate = useNavigate();
   const [authStatus, setAuthStatus] = useState('checking');
   
@@ -54,8 +56,9 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
         
         const user = data.user;
         
-        if (requireAdmin && user?.role?.toLowerCase() !== 'admin') {
-          navigate('/userdashboard');
+        const role = user?.role?.toLowerCase();
+        if ((requireAdmin && !['admin', 'superadmin'].includes(role)) || (requireMentor && role !== 'mentor')) {
+          navigate(role === 'mentor' ? '/mentordashboard' : ['admin', 'superadmin'].includes(role) ? '/dashboard' : '/userdashboard');
           return;
         }
         
@@ -68,7 +71,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
     };
     
     verifyAuth();
-  }, [navigate, requireAdmin]);
+  }, [navigate, requireAdmin, requireMentor]);
   
   if (authStatus === 'checking') {
     return <div>Loading...</div>;
@@ -78,14 +81,23 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 };
 
 const App = () => {
+  useEffect(() => {
+    // Remove caches written by older versions, which may contain private data.
+    try {
+      localStorage.removeItem('dashboardCache');
+      localStorage.removeItem('publicApiCache');
+    } catch { /* Storage may be unavailable. */ }
+  }, []);
   return (
     <div>
+      <Suspense fallback={<div>Loading...</div>}>
       <Routes>
         {/* Landing page - Shows dual login form */}
         <Route path="/" element={<Login />} />
         
         {/* Login route - same as default */}
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         
         {/* Admin dashboard - Only shows when authenticated as admin */}
         <Route path="/dashboard" element={
@@ -159,7 +171,7 @@ const App = () => {
           </ProtectedRoute>
         }/>
         <Route path="/mentordashboard" element={
-          <ProtectedRoute requireAdmin={true}>
+          <ProtectedRoute requireMentor={true}>
             <MentorDashboard/>
           </ProtectedRoute>
         }/>
@@ -181,7 +193,7 @@ const App = () => {
           </ProtectedRoute>
         } />
         <Route path="/help-requests" element={
-          <ProtectedRoute>
+          <ProtectedRoute requireAdmin={true}>
             <HelpRequests/>
           </ProtectedRoute>
         } />
@@ -194,6 +206,7 @@ const App = () => {
         {/* Catch-all redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </div>
   );
 }

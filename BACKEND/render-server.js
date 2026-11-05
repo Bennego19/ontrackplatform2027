@@ -1,12 +1,10 @@
+import { logError } from './utils/logError.mjs';
 // render-server.js - Optimized for Render
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import mongoSanitize from 'express-mongo-sanitize';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 // Import routes
 import mentorstudentassignment from './routes/mentorstudentassignment.mjs';
@@ -33,15 +31,24 @@ import accesscontrol from './routes/accesscontrol.mjs';
 import adminlogin from './routes/adminlogin.mjs';
 import addtask from './routes/addtask.mjs';
 import helpRequests from './routes/help-requests.mjs';
+import files from './routes/files.mjs';
+import passwordReset from './routes/passwordReset.mjs';
 import db from './db/conn.mjs';
+import { routePolicy } from './middleware/routePolicy.mjs';
+import { allowedCorsOrigins } from './utils/corsOrigins.mjs';
 
 dotenv.config();
 
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || Buffer.byteLength(process.env.JWT_SECRET, 'utf8') < 32 || process.env.JWT_SECRET === 'ontrack-connect-jwt-secret-key-2024')) {
+  throw new Error('Production requires a unique JWT_SECRET of at least 32 bytes');
+}
+if (process.env.NODE_ENV === 'production' && !process.env.DB_NAME?.trim()) {
+  console.error('Production requires an explicit DB_NAME');
+  throw new Error('Production requires an explicit DB_NAME');
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 
 // Security middleware
@@ -51,14 +58,7 @@ app.use(helmet({
 }));
 
 // CORS configuration for Render
-const allowedOrigins = [
-  'https://platform.ontrackconnect.co.za',
-  'https://platformontrackconnect.co.za',
-  'https://ontrackplatform2026-5.onrender.com', // Your Vercel frontend
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:5173'
-];
+const allowedOrigins = allowedCorsOrigins();
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -66,36 +66,29 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) === -1) {
-      console.warn('CORS blocked origin:', origin);
-      return callback(new Error(`CORS policy: ${origin} not allowed`), false);
+      console.warn('CORS blocked a request from an unapproved origin');
+      return callback(new Error('CORS policy: origin not allowed'), false);
     }
     return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID']
 }));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '256kb' }));
+app.use(express.urlencoded({ extended: true, limit: '256kb' }));
 
 // Security - prevent NoSQL injection
 app.use(mongoSanitize());
 
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  // URLs can contain account IDs or other sensitive values; log only status.
+  res.on('finish', () => console.log(`${new Date().toISOString()} - ${req.method} ${res.statusCode}`));
   next();
 });
-
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log('✅ Uploads directory created');
-}
-app.use('/uploads', express.static('uploads'));
 
 // Mount routes
 const routes = [
@@ -122,11 +115,13 @@ const routes = [
   { path: '/api/projects', router: projects, name: 'Projects' },
   { path: '/api/announcements', router: announcements, name: 'Announcements' },
   { path: '/api/addtask', router: addtask, name: 'Add Task' },
-  { path: '/api/help-requests', router: helpRequests, name: 'Help Requests' }
+  { path: '/api/help-requests', router: helpRequests, name: 'Help Requests' },
+  { path: '/api/files', router: files, name: 'Files' },
+  { path: '/api/password-reset', router: passwordReset, name: 'Password Reset' }
 ];
 
 routes.forEach(route => {
-  app.use(route.path, route.router);
+  app.use(route.path, routePolicy(route.path), route.router);
 });
 
 // Health check endpoint (REQUIRED for Render)
@@ -141,18 +136,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Simple test endpoint
-app.get('/api/test', (req, res) => {
-  res.json({ 
-    message: 'Backend API is working!',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      adminLogin: 'POST /api/adminlogin/adminlogin',
-      health: 'GET /api/health',
-      getAdmins: 'GET /api/adminlogin/admins'
-    }
-  });
+// Readiness checks the database separately from process liveness.
+app.get('/api/ready', async (req, res) => {
+  try {
+    await db();
+    res.json({ status: 'ready' });
+  } catch {
+    res.status(503).json({ status: 'not_ready' });
+  }
 });
+
+// Simple test endpoint
+app.get('/api/test', (req, res) => res.status(404).json({ error: 'Route not found' }));
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -168,26 +163,18 @@ app.get('/', (req, res) => {
 app.use('*', (req, res) => {
   res.status(404).json({ 
     error: 'Route not found',
-    path: req.originalUrl,
-    availableRoutes: [
-      'GET  /api/health',
-      'GET  /api/test',
-      'POST /api/adminlogin/adminlogin',
-      'GET  /api/adminlogin/admins'
-    ]
+    path: req.path
   });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('🚨 Server Error:', err.stack);
+  logError('Server error:', err);
   
   // Handle CORS errors
-  if (err.message.includes('CORS')) {
+  if (err.message?.includes('CORS')) {
     return res.status(403).json({ 
-      error: 'CORS Error',
-      message: err.message,
-      allowedOrigins: allowedOrigins
+      error: 'CORS Error'
     });
   }
   
@@ -205,7 +192,7 @@ app.listen(PORT, '0.0.0.0', async () => {
     await db();
     console.log('✅ Database connection initialized');
   } catch (err) {
-    console.error('❌ Database connection failed:', err.message);
+    logError('❌ Database connection failed:', err);
   }
 
   console.log(`

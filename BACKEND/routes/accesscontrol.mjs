@@ -1,9 +1,11 @@
+import { logError } from '../utils/logError.mjs';
 import express from "express";
 import db from "../db/conn.mjs";
 import { ObjectId } from "mongodb";
-import ExpressBrute from "express-brute";
+import { authenticateAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
+router.use(authenticateAdmin);
 
 router.use((req,res,next) =>{
     res.setHeader('X-Frame-Options','DENY');
@@ -11,13 +13,10 @@ router.use((req,res,next) =>{
     next();
 });
 
-var store = new ExpressBrute.MemoryStore();
-var bruteforce = new ExpressBrute(store);
-
 // GET all access control records
-router.get("/", bruteforce.prevent, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
-    let collection = await db.collection("accesscontrol");
+    let collection = await (await db()).collection("accesscontrol");
     let results = await collection.find({}).toArray();
     res.status(200).send(results);
   } catch (error) {
@@ -26,7 +25,7 @@ router.get("/", bruteforce.prevent, async (req, res) => {
 });
 
 // Create access control record
-router.post("/create", bruteforce.prevent, async (req, res) => {
+router.post("/create", async (req, res) => {
   try {
     const { userId, resource, permission, granted } = req.body;
 
@@ -36,7 +35,7 @@ router.post("/create", bruteforce.prevent, async (req, res) => {
       });
     }
 
-    const collection = await db.collection("accesscontrol");
+    const collection = await (await db()).collection("accesscontrol");
 
     const newRecord = {
       userId: userId,
@@ -57,7 +56,7 @@ router.post("/create", bruteforce.prevent, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Create access control error:", error);
+    logError("Create access control error:", error);
     res.status(500).json({
       message: "Internal server error during access control creation"
     });
@@ -65,7 +64,7 @@ router.post("/create", bruteforce.prevent, async (req, res) => {
 });
 
 // Update access control record
-router.patch("/:id", bruteforce.prevent, async (req, res) => {
+router.patch("/:id", async (req, res) => {
   try {
     const query = { _id: new ObjectId(req.params.id) };
     const updates = {
@@ -77,7 +76,7 @@ router.patch("/:id", bruteforce.prevent, async (req, res) => {
       },
     };
 
-    let collection = await db.collection("accesscontrol");
+    let collection = await (await db()).collection("accesscontrol");
     let result = await collection.updateOne(query, updates);
     res.send(result).status(200);
   } catch (error) {
@@ -86,10 +85,10 @@ router.patch("/:id", bruteforce.prevent, async (req, res) => {
 });
 
 // Delete access control record
-router.delete("/:id", bruteforce.prevent, async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const query = { _id: new ObjectId(req.params.id) };
-    const collection = await db.collection("accesscontrol");
+    const collection = await (await db()).collection("accesscontrol");
     let result = await collection.deleteOne(query);
     res.send(result).status(200);
   } catch (error) {
@@ -98,11 +97,11 @@ router.delete("/:id", bruteforce.prevent, async (req, res) => {
 });
 
 // Check user access to resource
-router.get("/check/:userId/:resource/:permission", bruteforce.prevent, async (req, res) => {
+router.get("/check/:userId/:resource/:permission", async (req, res) => {
   try {
     const { userId, resource, permission } = req.params;
 
-    const collection = await db.collection("accesscontrol");
+    const collection = await (await db()).collection("accesscontrol");
     const record = await collection.findOne({
       userId: userId,
       resource: resource,
@@ -122,7 +121,7 @@ router.get("/check/:userId/:resource/:permission", bruteforce.prevent, async (re
     });
 
   } catch (error) {
-    console.error("Check access error:", error);
+    logError("Check access error:", error);
     res.status(500).json({
       message: "Internal server error during access check"
     });

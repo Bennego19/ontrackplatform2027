@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { authAPI, tokenManager } from "../services/authMiddleware";
-import { mentorAuthAPI } from "../services/mentorAuthMiddleware";
+import { tokenManager } from "../services/authMiddleware";
 import "./managementor.css";
 
 export default function AssignMentor() {
@@ -23,6 +22,8 @@ export default function AssignMentor() {
 
   useEffect(() => {
     fetchAllData();
+    // Load once on mount; assignment actions explicitly refresh the lists.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAllData = async () => {
@@ -54,7 +55,6 @@ export default function AssignMentor() {
       if (!response.ok) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
-      console.log("Mentors data received:", data);
       setMentors(data);
     } catch (error) {
       console.error("Error fetching mentors:", error);
@@ -79,7 +79,6 @@ export default function AssignMentor() {
       if (!response.ok) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
-      console.log("Students data received:", data);
       setStudents(data);
     } catch (error) {
       console.error("Error fetching students:", error);
@@ -164,7 +163,6 @@ export default function AssignMentor() {
         studentIds: formData.students
       };
 
-      console.log("Submitting assignment data:", assignmentData);
 
       const response = await fetch("/api/mentorstudentassignment/student", {
         method: "POST",

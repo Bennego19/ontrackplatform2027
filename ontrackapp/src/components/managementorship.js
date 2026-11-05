@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { tokenManager } from '../services/authMiddleware';
+import { studentTracks as tracks } from '../config/studentTracks';
+import DocumentDownloadButton from './DocumentDownloadButton';
 import "./managementor.css";
 
 export default function ManageMentorship() {
@@ -22,18 +23,8 @@ export default function ManageMentorship() {
   });
 
   const [updateFormData, setUpdateFormData] = useState({});
-  const [deleteId, setDeleteId] = useState("");
-
-  const navigate = useNavigate();
 
   const assessmentTypes = ["task", "assignment", "project", "module"];
-  const tracks = ["webdev", "java", "csharp", "python"];
-
-  // Helper: extract field-specific errors
-  function getFieldError(fieldName) {
-    const err = errors.find(e => e.field === fieldName);
-    return err ? err.message : "";
-  }
 
   const showMessage = (text, type = "success") => {
     if (type === "success") {
@@ -75,7 +66,7 @@ export default function ManageMentorship() {
 
     try {
       const token = tokenManager.getToken();
-      const response = await axios.post("/api/assessments", data, {
+      await axios.post("/api/assessments", data, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
@@ -115,7 +106,7 @@ export default function ManageMentorship() {
       const response = await axios.get("/api/assessments", {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-      setAssessments(Array.isArray(response.data) ? response.data : []);
+      setAssessments(Array.isArray(response.data) ? response.data.filter(item => item.program === 'Mentorship Program') : []);
     } catch (error) {
       console.error("Error loading assessments:", error);
       setAssessments([]);
@@ -129,7 +120,7 @@ export default function ManageMentorship() {
       const response = await axios.get("/api/assessments", {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-      setUpdateAssessments(Array.isArray(response.data) ? response.data : []);
+      setUpdateAssessments(Array.isArray(response.data) ? response.data.filter(item => item.program === 'Mentorship Program') : []);
     } catch (error) {
       console.error("Error loading assessments for update:", error);
       setUpdateAssessments([]);
@@ -422,10 +413,8 @@ export default function ManageMentorship() {
                             <td>{assessment.assessmentname}</td>
                             <td>{assessment.assessmenttype}</td>
                             <td>
-                              {assessment.documentLink ? (
-                                <a href={assessment.documentLink} target="_blank" rel="noopener noreferrer">
-                                  View File
-                                </a>
+                              {assessment.document?.relativePath ? (
+                                <DocumentDownloadButton url={assessment.document.relativePath}>Download file</DocumentDownloadButton>
                               ) : (
                                 'No file'
                               )}

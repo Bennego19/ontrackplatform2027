@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { authAPI } from "../services/authMiddleware";
 
 import { tokenManager } from "../services/authMiddleware";
 import "./OnboardMentor.css";
@@ -26,8 +24,8 @@ export default function ManageMentors() {
   const [loadingRead, setLoadingRead] = useState(false);
   const [loadingUpdate, setLoadingUpdate] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [resetLink, setResetLink] = useState('');
 
-  const navigate = useNavigate();
 
   // Helper: extract field-specific errors
   function getFieldError(fieldName) {
@@ -78,8 +76,8 @@ export default function ManageMentors() {
     if (!formData.username.trim()) newErrors.push({ field: "username", message: "Username is required" });
     if (!formData.password.trim()) {
       newErrors.push({ field: "password", message: "Password is required" });
-    } else if (formData.password.length < 6) {
-      newErrors.push({ field: "password", message: "Password must be at least 6 characters" });
+    } else if (formData.password.length < 12) {
+      newErrors.push({ field: "password", message: "Password must be at least 12 characters" });
     }
 
     setErrors(newErrors);
@@ -107,7 +105,9 @@ export default function ManageMentors() {
     setSuccessMessage("");
 
     try {
-      const response = await axios.post("/api/onboardmentors/onboardmentor", formData);
+      await axios.post("/api/onboardmentors/onboardmentor", formData, {
+        headers: { Authorization: `Bearer ${tokenManager.getToken()}` }
+      });
 
       showMessage(`✅ Mentor "${formData.name} ${formData.surname}" onboarded successfully!`);
       
@@ -157,6 +157,18 @@ export default function ManageMentors() {
     }
   };
 
+  const createResetLink = async id => {
+    setResetLink('');
+    try {
+      const response = await fetch(`/api/password-reset/issue/mentor/${id}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${tokenManager.getToken()}` }, cache: 'no-store'
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Unable to create reset link');
+      setResetLink(`${window.location.origin}/reset-password#${data.token}`);
+    } catch (error) { showMessage(error.message || 'Unable to create reset link', 'error'); }
+  };
+
   // UPDATE MENTORS
   const loadMentorsForUpdate = async () => {
     setLoadingUpdate(true);
@@ -178,7 +190,7 @@ export default function ManageMentors() {
           email: mentor.email || '',
           cellnumber: mentor.cellnumber || '',
           username: mentor.username || '',
-          password: mentor.password || ''
+          password: ''
         };
       });
       setUpdateFormData(initialUpdateData);
@@ -203,7 +215,7 @@ export default function ManageMentors() {
   const updateMentor = async (id) => {
     try {
       const mentorData = updateFormData[id] || {};
-      const response = await axios.patch(`/api/onboardmentors/${id}`, mentorData, {
+      await axios.patch(`/api/onboardmentors/${id}`, mentorData, {
         headers: {
           'Authorization': `Bearer ${tokenManager.getToken()}`,
           'Content-Type': 'application/json'
@@ -272,6 +284,8 @@ export default function ManageMentors() {
 
   useEffect(() => {
     loadMentors();
+    // Load once on mount; tab actions explicitly refresh the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -285,6 +299,11 @@ export default function ManageMentors() {
 
         {/* SUCCESS MESSAGE */}
         {successMessage && <div className="success-message">{successMessage}</div>}
+        {resetLink && <div className="success-message"><label>Single-use reset link (expires in 15 minutes)
+          <input aria-label="Mentor password reset link" type="text" readOnly value={resetLink} onFocus={event => event.target.select()} />
+        </label><p>Share this link securely with the mentor. Creating another link invalidates this one.</p>
+          <button type="button" onClick={() => setResetLink('')}>Dismiss</button>
+        </div>}
 
         {/* GENERAL ERRORS */}
         {errors.some(e => e.field === "general") && (
@@ -424,6 +443,7 @@ export default function ManageMentors() {
                           <label className="form-label">Password *</label>
                           <input
                             type="password"
+                            minLength={12}
                             className={`form-input ${getFieldError("password") ? "error" : ""}`}
                             placeholder="Enter password"
                             value={formData.password}
@@ -489,7 +509,7 @@ export default function ManageMentors() {
                             <th>Last Name</th>
                             <th>Cell Number</th>
                             <th>Username</th>
-                            <th>Password</th>
+                            <th>Account recovery</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -500,7 +520,7 @@ export default function ManageMentors() {
                               <td>{mentor.surname}</td>
                               <td>{mentor.cellnumber}</td>
                               <td>{mentor.username}</td>
-                                 <td>{mentor.password}</td>
+                              <td><button type="button" onClick={() => createResetLink(mentor._id || mentor.id)} aria-label={`Reset password for ${mentor.username}`}>Create reset link</button></td>
                             </tr>
                           ))}
                         </tbody>

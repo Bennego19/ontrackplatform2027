@@ -1,29 +1,30 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 import ManageStudents from './onboardstudent';
 import { tokenManager } from '../services/authMiddleware';
 
 // Mock the authMiddleware
-jest.mock('../services/authMiddleware', () => ({
+vi.mock('../services/authMiddleware', () => ({
   tokenManager: {
-    getToken: jest.fn(() => 'mock-jwt-token'),
+    getToken: vi.fn(() => 'mock-jwt-token'),
   },
   authAPI: {},
 }));
 
 // Mock react-router-dom
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }));
 
 // Mock fetch globally
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 describe('ManageStudents Component - Authentication Headers', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
+    tokenManager.getToken.mockReturnValue('mock-jwt-token');
     // Mock successful fetch responses
     fetch.mockImplementation(() =>
       Promise.resolve({
@@ -248,6 +249,21 @@ describe('ManageStudents Component - Authentication Headers', () => {
     await waitFor(() => {
       expect(screen.getByText('Failed to load students.')).toBeInTheDocument();
     });
+  });
+
+  test('creates a single-use reset link for a student', async () => {
+    fetch.mockImplementation(url => Promise.resolve({
+      ok: true,
+      json: async () => url.includes('/password-reset/')
+        ? { token: 'A'.repeat(43) }
+        : [{ _id: '123', name: 'Test', surname: 'Student', username: 'teststudent' }]
+    }));
+    render(<ManageStudents />);
+    fireEvent.click(screen.getByRole('button', { name: 'View Students' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset password for teststudent' }));
+    const field = await screen.findByLabelText('Student password reset link');
+    expect(field.value).toContain(`/reset-password#${'A'.repeat(43)}`);
+    expect(fetch).toHaveBeenCalledWith('/api/password-reset/issue/123', expect.objectContaining({ method: 'POST', headers: { Authorization: 'Bearer mock-jwt-token' } }));
   });
 
   test('handles network errors gracefully', async () => {

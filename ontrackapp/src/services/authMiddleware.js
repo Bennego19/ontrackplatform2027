@@ -2,6 +2,8 @@
 // REFACTORED: ontrackapp/src/services/authMiddleware.js
 // ======================
 
+import { readApiJson } from './readApiJson';
+
 /* =========================
    TOKEN MANAGER
 ========================= */
@@ -52,6 +54,8 @@ export const tokenManager = {
     try {
       localStorage.removeItem("authToken");
       localStorage.removeItem("user");
+      localStorage.removeItem("dashboardCache");
+      localStorage.removeItem("publicApiCache");
     } catch {}
   },
 
@@ -85,7 +89,7 @@ const authFetch = async (endpoint, options = {}) => {
     }
   });
 
-  const data = await response.json();
+  const data = await readApiJson(response);
 
   if (!response.ok) {
     if (response.status === 403 && data.accessDenied) {
@@ -115,7 +119,7 @@ export const authAPI = {
       }
     );
 
-    const data = await response.json();
+    const data = await readApiJson(response);
     if (!response.ok) {
       throw new Error(data.message || "Login failed");
     }
@@ -146,7 +150,7 @@ export const authAPI = {
       }
     );
 
-    const data = await response.json();
+    const data = await readApiJson(response);
     if (!response.ok) {
       throw new Error(data.message || "Admin login failed");
     }
@@ -175,7 +179,7 @@ export const authAPI = {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ token }),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(70000)
       });
 
       if (!resp.ok) {
@@ -183,7 +187,7 @@ export const authAPI = {
         return { success: false, message: 'Token invalid' };
       }
 
-      const data = await resp.json();
+      const data = await readApiJson(resp);
       return data;
     } catch (err) {
       tokenManager.clearAuth();
@@ -218,9 +222,9 @@ export const authAPI = {
   getStudentMentor: () => authFetch("/api/mentorstudentassignment/student"),
 
   getAllMentors: async () => {
-    const response = await fetch("/api/onboardmentors");
+    const response = await fetch("/api/onboardmentors", { headers: { Authorization: `Bearer ${tokenManager.getToken()}` } });
 
-    const data = await response.json();
+    const data = await readApiJson(response);
 
     if (!response.ok) {
       throw new Error(data.message || "Failed to fetch mentors");

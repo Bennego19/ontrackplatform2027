@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { tokenManager } from "../services/authMiddleware";
+import { studentTracks as tracks } from '../config/studentTracks';
 import "./managementor.css";
 
 export default function ManageInternship() {
@@ -24,23 +24,8 @@ export default function ManageInternship() {
   const [updateFormData, setUpdateFormData] = useState({});
   const [deleteId, setDeleteId] = useState("");
 
-  const navigate = useNavigate();
 
   const assessmentTypes = ["task", "assignment", "project", "module"];
-  const tracks = ["webdev", "java", "csharp", "python"];
-  const programs = [
-    { name: "Mentorship Program" },
-    { name: "Internship Program" },
-    { name: "Skill Development Program" },
-    { name: "Graduate Program" }
-  ];
-
-  // Helper: extract field-specific errors
-  function getFieldError(fieldName) {
-    const err = errors.find(e => e.field === fieldName);
-    return err ? err.message : "";
-  }
-
   const showMessage = (text, type = "success") => {
     if (type === "success") {
       setSuccessMessage(text);
@@ -134,7 +119,7 @@ export default function ManageInternship() {
           Authorization: `Bearer ${token}`
         }
       });
-      setUpdateAssessments(Array.isArray(response.data) ? response.data : []);
+      setUpdateAssessments(Array.isArray(response.data) ? response.data.filter(item => item.program === 'Internship Program') : []);
     } catch (error) {
       console.error("Error loading assessments for update:", error);
       setUpdateAssessments([]);
@@ -232,6 +217,8 @@ export default function ManageInternship() {
   useEffect(() => {
     loadAssessments();
     loadUpdateTable();
+    // Load once on mount; tab actions explicitly refresh the lists.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isCreateFormValid =
@@ -446,8 +433,8 @@ export default function ManageInternship() {
                       </thead>
                       <tbody>
                         {assessments.map(assessment => (
-                          <tr key={assessment.id}>
-                            <td>{assessment.id}</td>
+                          <tr key={assessment._id}>
+                            <td>{assessment._id}</td>
                             <td>{assessment.assessmentname}</td>
                             <td>{assessment.assessmenttype}</td>
                             <td>{assessment.dateadded ? assessment.dateadded.split('T')[0] : ''}</td>
@@ -489,20 +476,20 @@ export default function ManageInternship() {
                       </thead>
                       <tbody>
                         {updateAssessments.map(assessment => (
-                          <tr key={assessment.id}>
-                            <td>{assessment.id}</td>
+                          <tr key={assessment._id}>
+                            <td>{assessment._id}</td>
                             <td>
                               <input
                                 type="text"
                                 defaultValue={assessment.assessmentname}
-                                onChange={(e) => handleUpdateChange(assessment.id, "assessmentname", e.target.value)}
+                                onChange={(e) => handleUpdateChange(assessment._id, "assessmentname", e.target.value)}
                                 className="update-input"
                               />
                             </td>
                             <td>
                               <select
                                 defaultValue={assessment.assessmenttype}
-                                onChange={(e) => handleUpdateChange(assessment.id, "assessmenttype", e.target.value)}
+                                onChange={(e) => handleUpdateChange(assessment._id, "assessmenttype", e.target.value)}
                                 className="update-select"
                               >
                                 {assessmentTypes.map((type, index) => (
@@ -521,7 +508,7 @@ export default function ManageInternship() {
                             <td>
                               <select
                                 defaultValue={assessment.track}
-                                onChange={(e) => handleUpdateChange(assessment.id, "track", e.target.value)}
+                                onChange={(e) => handleUpdateChange(assessment._id, "track", e.target.value)}
                                 className="update-select"
                               >
                                 {tracks.map((track, index) => (
@@ -535,13 +522,13 @@ export default function ManageInternship() {
                             <td>
                               <div className="action-buttons">
                                 <button
-                                  onClick={() => updateAssessment(assessment.id)}
+                                  onClick={() => updateAssessment(assessment._id)}
                                   className="update-btn"
                                 >
                                   💾 Save
                                 </button>
                                 <button
-                                  onClick={() => cancelEdit(assessment.id)}
+                                  onClick={() => cancelEdit(assessment._id)}
                                   className="cancel-btn"
                                 >
                                   ❌ Cancel

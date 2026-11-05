@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { tokenManager } from "../services/authMiddleware";
+import { studentTracks as tracks } from '../config/studentTracks';
 import "./managementor.css";
 
 export default function ManageGraduate() {
@@ -22,18 +22,8 @@ export default function ManageGraduate() {
   });
 
   const [updateFormData, setUpdateFormData] = useState({});
-  const [deleteId, setDeleteId] = useState("");
-
-  const navigate = useNavigate();
 
   const assessmentTypes = ["task", "assignment", "project", "module"];
-  const tracks = ["webdev", "java", "csharp", "python", "graduate"];
-
-  // Helper: extract field-specific errors
-  function getFieldError(fieldName) {
-    const err = errors.find(e => e.field === fieldName);
-    return err ? err.message : "";
-  }
 
   const showMessage = (text, type = "success") => {
     if (type === "success") {
@@ -153,7 +143,7 @@ export default function ManageGraduate() {
       };
 
       const token = tokenManager.getToken();
-      await axios.put(`/api/assessments/${id}`, dataToSend, {
+      await axios.patch(`/api/assessments/${id}`, dataToSend, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
 
@@ -414,8 +404,8 @@ export default function ManageGraduate() {
                       </thead>
                       <tbody>
                         {assessments.map(assessment => (
-                          <tr key={assessment.id}>
-                            <td>{assessment.id}</td>
+                          <tr key={assessment._id}>
+                            <td>{assessment._id}</td>
                             <td>{assessment.assessmentname}</td>
                             <td>{assessment.assessmenttype}</td>
                             <td>{assessment.dateadded ? assessment.dateadded.split('T')[0] : ''}</td>
@@ -457,20 +447,20 @@ export default function ManageGraduate() {
                       </thead>
                       <tbody>
                         {updateAssessments.map(assessment => (
-                          <tr key={assessment.id}>
-                            <td>{assessment.id}</td>
+                          <tr key={assessment._id}>
+                            <td>{assessment._id}</td>
                             <td>
                               <input
                                 type="text"
                                 defaultValue={assessment.assessmentname}
-                                onChange={(e) => handleUpdateChange(assessment.id, "assessmentname", e.target.value)}
+                                onChange={(e) => handleUpdateChange(assessment._id, "assessmentname", e.target.value)}
                                 className="update-input"
                               />
                             </td>
                             <td>
                               <select
                                 defaultValue={assessment.assessmenttype}
-                                onChange={(e) => handleUpdateChange(assessment.id, "assessmenttype", e.target.value)}
+                                onChange={(e) => handleUpdateChange(assessment._id, "assessmenttype", e.target.value)}
                                 className="update-select"
                               >
                                 {assessmentTypes.map((type, index) => (
@@ -489,7 +479,7 @@ export default function ManageGraduate() {
                             <td>
                               <select
                                 defaultValue={assessment.track}
-                                onChange={(e) => handleUpdateChange(assessment.id, "track", e.target.value)}
+                                onChange={(e) => handleUpdateChange(assessment._id, "track", e.target.value)}
                                 className="update-select"
                               >
                                 {tracks.map((track, index) => (
@@ -502,13 +492,13 @@ export default function ManageGraduate() {
                             <td>
                               <div className="action-buttons">
                                 <button 
-                                  onClick={() => updateAssessment(assessment.id)}
+                                  onClick={() => updateAssessment(assessment._id)}
                                   className="update-btn"
                                 >
                                   💾 Save
                                 </button>
                                 <button 
-                                  onClick={() => cancelEdit(assessment.id)}
+                                  onClick={() => cancelEdit(assessment._id)}
                                   className="cancel-btn"
                                 >
                                   ❌ Cancel
@@ -549,14 +539,14 @@ export default function ManageGraduate() {
                       </thead>
                       <tbody>
                         {assessments.map(assessment => (
-                          <tr key={assessment.id}>
+                          <tr key={assessment._id}>
                             <td>{assessment.assessmentname}</td>
                             <td>{assessment.assessmenttype}</td>
                             <td>{assessment.dateadded ? assessment.dateadded.split('T')[0] : ''}</td>
                             <td>{assessment.datedue ? assessment.datedue.split('T')[0] : ''}</td>
                             <td>
                               <button
-                                onClick={() => handleDeleteSubmit(assessment.id)}
+                                onClick={() => handleDeleteSubmit(assessment._id)}
                                 className="delete-btn"
                               >
                                 🗑️ Delete

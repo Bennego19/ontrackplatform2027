@@ -1,3 +1,4 @@
+import { logError } from '../utils/logError.mjs';
 // middleware/dbMiddleware.mjs
 import { getDatabase } from '../db/conn.mjs';
 
@@ -14,7 +15,7 @@ export const ensureDatabase = async (req, res, next) => {
     req.db = dbInstance;
     next();
   } catch (error) {
-    console.error('Database connection error:', error);
+    logError('Database connection error:', error);
     
     // Attempt reconnection
     try {

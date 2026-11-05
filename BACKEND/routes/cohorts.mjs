@@ -1,9 +1,9 @@
+import { logError } from '../utils/logError.mjs';
 import express from "express";
 import db from "../db/conn.mjs"
 import { ObjectId } from "mongodb";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import ExpressBrute from "express-brute";
 const router = express.Router();
 
 router.use((req,res,next) =>{
@@ -12,11 +12,7 @@ router.use((req,res,next) =>{
     next();
 });
 
-
-var store = new ExpressBrute.MemoryStore();
-var bruteforce = new ExpressBrute(store);
-
-router.get("/",bruteforce.prevent, async (req,res) =>{
+router.get("/", async (req,res) =>{
     const database = await db();
     let collection = database.collection("cohort");
     let results = await collection.find({}).toArray();
@@ -25,7 +21,7 @@ router.get("/",bruteforce.prevent, async (req,res) =>{
 
 
 //creating a cohort
-router.post("/createcohort",bruteforce.prevent, async(req,res) =>{
+router.post("/createcohort", async(req,res) =>{
     let newDocument ={
        cohortname: req.body.cohortname,
        cohorttrack: req.body.cohorttrack,
@@ -41,7 +37,7 @@ router.post("/createcohort",bruteforce.prevent, async(req,res) =>{
 }
 );
 
-router.patch("/:id",bruteforce.prevent, async (req, res) => {
+router.patch("/:id", async (req, res) => {
     const query = { _id: new ObjectId(req.params.id) };
     const updates = {
       $set: {
@@ -61,7 +57,7 @@ res.send(result).status(200);
 
 
 
-  router.delete("/:id", bruteforce.prevent, async(req,res) =>{
+  router.delete("/:id", async(req,res) =>{
         const query = { _id: new ObjectId(req.params.id) };
 
         const database = await db();
@@ -72,7 +68,7 @@ res.send(result).status(200);
     });
 
 // GET total cohorts count - FOR DASHBOARD
-router.get("/total", bruteforce.prevent, async (req, res) => {
+router.get("/total", async (req, res) => {
   res.setHeader('X-Frame-Options', 'DENY');
   try {
     const database = await db();
@@ -84,7 +80,7 @@ router.get("/total", bruteforce.prevent, async (req, res) => {
       message: "Total cohorts retrieved successfully"
     });
   } catch (error) {
-    console.error("Error fetching total cohorts:", error);
+    logError("Error fetching total cohorts:", error);
     res.status(500).json({
       error: "Failed to fetch total cohorts"
     });

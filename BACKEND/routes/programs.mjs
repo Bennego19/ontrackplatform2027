@@ -1,9 +1,9 @@
+import { logError } from '../utils/logError.mjs';
 // routes/programs.mjs
 import express from "express";
 import { ObjectId } from "mongodb";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import ExpressBrute from "express-brute";
 const router = express.Router();
 
 router.use((req,res,next) =>{
@@ -12,10 +12,6 @@ router.use((req,res,next) =>{
     next();
 });
 
-var store = new ExpressBrute.MemoryStore();
-var bruteforce = new ExpressBrute(store);
-
-
 router.use((req,res,next) =>{
     res.setHeader('X-Frame-Options','DENY');
     res.setHeader('Content-Security-Policy',"frame-ancestors 'none'");
@@ -23,7 +19,7 @@ router.use((req,res,next) =>{
 });
 
 // GET /api/programs - Get all available programs
-router.get("/", bruteforce.prevent,async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     // Return predefined programs as they are static
     const programs = [
@@ -35,7 +31,7 @@ router.get("/", bruteforce.prevent,async (req, res) => {
 
     res.status(200).json(programs);
   } catch (error) {
-    console.error("Error fetching programs:", error);
+    logError("Error fetching programs:", error);
     res.status(500).json({
       error: "Failed to fetch programs"
     });

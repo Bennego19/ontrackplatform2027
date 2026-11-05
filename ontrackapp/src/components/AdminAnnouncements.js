@@ -38,7 +38,11 @@ export default function AdminAnnouncements() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Initial load; later refreshes are triggered by the actions below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const save = async (e) => {
     e && e.preventDefault();
@@ -111,6 +115,7 @@ export default function AdminAnnouncements() {
           <p className="manage-mentorship-subtitle">Create and manage site-wide announcements</p>
         </div>
 
+        {loading && <p role="status">Loading announcements…</p>}
         {successMessage && <div className="success-message">{successMessage}</div>}
         {errors.some(e => e.field === 'general') && (
           <div className="error-message general-error">{errors.filter(e=>e.field==='general').map((err,idx)=>(<div key={idx}>{err.message}</div>))}</div>

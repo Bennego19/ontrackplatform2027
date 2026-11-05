@@ -3,13 +3,9 @@ import db from "../db/conn.mjs"
 import { ObjectId } from "mongodb";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import ExpressBrute from "express-brute";
 const router = express.Router();
 
-var store = new ExpressBrute.MemoryStore();
-var bruteforce = new ExpressBrute(store);
-
-router.get("/",bruteforce.prevent, async (req,res) =>{
+router.get("/", async (req,res) =>{
     const database = await db();
     let collection = database.collection("skillsdevelopment");
     let results = await collection.find({}).toArray();
@@ -18,7 +14,7 @@ router.get("/",bruteforce.prevent, async (req,res) =>{
 
 
 //creating a cohort
-router.post("/resources",bruteforce.prevent, async(req,res) =>{
+router.post("/resources", async(req,res) =>{
     let newDocument ={
     id: req.body.id,
     title: req.body.title,
@@ -39,7 +35,7 @@ router.post("/resources",bruteforce.prevent, async(req,res) =>{
 }
 );
 
-router.patch("/:id",bruteforce.prevent, async (req, res) => {
+router.patch("/:id", async (req, res) => {
     const query = { _id: new ObjectId(req.params.id) };
     const updates = {
       $set: {
@@ -59,7 +55,7 @@ router.patch("/:id",bruteforce.prevent, async (req, res) => {
 
 
 
-  router.delete("/:id",bruteforce.prevent, async(req,res) =>{
+  router.delete("/:id", async(req,res) =>{
         const query = { _id: new ObjectId(req.params.id) };
 
         const database = await db();

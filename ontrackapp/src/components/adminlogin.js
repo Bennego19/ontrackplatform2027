@@ -80,7 +80,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
             </div>
 
             <div className="forgot-password">
-              <a href="#" className="forgot-link">Forgot password?</a>
+              <span className="forgot-link">Contact your administrator for account help.</span>
             </div>
 
             {loginError && (
@@ -98,7 +98,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
             </button>
 
             <div className="signup-section">
-              <p>Create an account <a href="#" className="signup-link">Signup now</a></p>
+              <p>Accounts are created by an administrator.</p>
             </div>
 
             <div className="copyright">

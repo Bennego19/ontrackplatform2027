@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import "./OnboardStudent.css";
 import { tokenManager } from '../services/authMiddleware';
 
@@ -21,7 +20,6 @@ export default function Events() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const navigate = useNavigate();
 
   // Helper: extract field-specific errors
   function getFieldError(fieldName) {
@@ -67,7 +65,7 @@ export default function Events() {
     try {
       const response = await fetch("/api/events", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenManager.getToken()}` },
         body: JSON.stringify({
           name: formData.name.trim(),
           description: formData.description.trim(),
@@ -115,7 +113,7 @@ export default function Events() {
   // READ EVENTS
   const loadEvents = async () => {
     try {
-      const response = await fetch("/api/events");
+      const response = await fetch("/api/events", { headers: { Authorization: `Bearer ${tokenManager.getToken()}` } });
       if (response.ok) {
         const data = await response.json();
         setEvents(data);
@@ -160,7 +158,7 @@ export default function Events() {
       const eventData = updateFormData[id] || {};
       const response = await fetch(`/api/events/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenManager.getToken()}` },
         body: JSON.stringify(eventData)
       });
 
@@ -230,6 +228,8 @@ export default function Events() {
 
   useEffect(() => {
     loadEvents();
+    // Load once on mount; tab actions explicitly refresh the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

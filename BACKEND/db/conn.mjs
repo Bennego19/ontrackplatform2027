@@ -1,8 +1,10 @@
+import { logError } from '../utils/logError.mjs';
 // conn.mjs - IMPROVED VERSION
 // MongoDB connection manager with dual export patterns
 
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
+import { ensureIndexes } from './indexes.mjs';
 
 dotenv.config();
 
@@ -37,20 +39,22 @@ const connectToDatabase = async () => {
     await client.connect();
     console.log('✅ MongoDB connected successfully');
 
-    dbInstance = client.db(dbName);
-    console.log(`📊 Database: ${dbInstance.databaseName}`);
+    const database = client.db(dbName);
+    console.log(`📊 Database: ${database.databaseName}`);
     
     // Test connection with a ping
-    await dbInstance.command({ ping: 1 });
+    await database.command({ ping: 1 });
+    await ensureIndexes(database);
+    dbInstance = database;
     console.log('✅ Database ping successful');
     
     return dbInstance;
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error.message);
+    logError('❌ MongoDB connection error:', error);
     // Clean up on failure
     dbInstance = null;
     if (client) {
-      await client.close().catch(console.error);
+      await client.close().catch(closeError => logError('MongoDB cleanup failed:', closeError));
       client = null;
     }
     throw error;
@@ -69,8 +73,10 @@ export const getDatabase = async () => {
       return dbInstance;
     } catch (pingError) {
       console.log('⚠️ Connection test failed, reconnecting...');
+      const oldClient = client;
       dbInstance = null;
       client = null;
+      if (oldClient) await oldClient.close().catch(() => {});
     }
   }
 
@@ -96,7 +102,7 @@ export const initializeDatabase = async () => {
     console.log('🚀 Database initialized and ready');
     return true;
   } catch (error) {
-    console.error('❌ Failed to initialize database:', error.message);
+    logError('❌ Failed to initialize database:', error);
     return false;
   }
 };
@@ -110,7 +116,7 @@ export const closeDatabase = async () => {
       await client.close();
       console.log('👋 MongoDB connection closed gracefully');
     } catch (error) {
-      console.error('Error closing database:', error.message);
+      logError('Error closing database:', error);
     } finally {
       client = null;
       dbInstance = null;
@@ -147,7 +153,7 @@ export default getDatabase;
       const total = await collection.countDocuments();
       res.json({ total });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: 'Database operation failed' });
     }
   });
 */
@@ -202,11 +208,11 @@ export default getDatabase;
 });
 
 // Handle uncaught errors
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+process.on('unhandledRejection', reason => {
+  logError('Unhandled rejection:', reason);
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  logError('Uncaught Exception:', error);
   closeDatabase().finally(() => process.exit(1));
 });

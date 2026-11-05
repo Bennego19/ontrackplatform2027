@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { authAPI } from "../services/authMiddleware";
 import { mentorAuthAPI } from "../services/mentorAuthMiddleware";
+import DocumentDownloadButton from './DocumentDownloadButton';
 
 import { tokenManager } from '../services/authMiddleware';
 
@@ -31,16 +31,13 @@ const MentorDashboard = () => {
   const [editingAssignment, setEditingAssignment] = useState(null);
   const [editingProject, setEditingProject] = useState(null);
   const [editingProfile, setEditingProfile] = useState(null);
+  const [profileMessage, setProfileMessage] = useState('');
 
   // Form visibility states
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showAssignmentForm, setShowAssignmentForm] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [showResourceForm, setShowResourceForm] = useState(false);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-
-  // Schedule form state
-  const [scheduleData, setScheduleData] = useState({ studentId: '', date: '', time: '', topic: '', description: '' });
   // Navigation configuration
   const navigationTabs = [
     { id: 'dashboard-pane', label: 'Dashboard', icon: '📊' },
@@ -66,6 +63,8 @@ const MentorDashboard = () => {
       }
     };
     initializeAuth();
+    // Restore the saved session once on mount; login loads data separately.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch all mentor data when authenticated
@@ -73,6 +72,7 @@ const MentorDashboard = () => {
     setLoading(true);
     try {
       await Promise.all([
+        fetchProfile(),
         fetchAssignedStudents(),
         fetchTasks(),
         fetchAssignments(),
@@ -88,6 +88,13 @@ const MentorDashboard = () => {
   };
 
   // API functions
+  const fetchProfile = async () => {
+    try {
+      const profile = await mentorAuthAPI.getProfile();
+      setUserData(profile);
+      tokenManager.setStoredUser(profile);
+    } catch { setError('Failed to load profile'); }
+  };
   const fetchAssignedStudents = async () => {
     try {
       const students = await mentorAuthAPI.getAssignedStudents();
@@ -105,11 +112,8 @@ const MentorDashboard = () => {
       setTasks(tasksData);
     } catch (err) {
       console.error('Error fetching tasks:', err);
-      // Mock data
-      setTasks([
-        { id: 1, title: 'Complete React Project', description: 'Build a complete React application with state management', dueDate: '2024-02-15', priority: 'high', assignedTo: 1, status: 'pending' },
-        { id: 2, title: 'Database Design', description: 'Design database schema for student management system', dueDate: '2024-02-20', priority: 'medium', assignedTo: 2, status: 'in-progress' }
-      ]);
+      setTasks([]);
+      setError('Failed to load tasks');
     }
   };
 
@@ -119,11 +123,8 @@ const MentorDashboard = () => {
       setAssignments(assignmentsData);
     } catch (err) {
       console.error('Error fetching assignments:', err);
-      // Mock data
-      setAssignments([
-        { id: 1, title: 'JavaScript Fundamentals', description: 'Basic JavaScript concepts and exercises', dueDate: '2024-02-18', maxScore: 100, course: 'CS101', instructions: 'Complete all exercises in the textbook' },
-        { id: 2, title: 'React Components', description: 'Building reusable React components', dueDate: '2024-02-25', maxScore: 100, course: 'CS102', instructions: 'Create a component library' }
-      ]);
+      setAssignments([]);
+      setError('Failed to load assignments');
     }
   };
 
@@ -133,11 +134,8 @@ const MentorDashboard = () => {
       setProjects(projectsData);
     } catch (err) {
       console.error('Error fetching projects:', err);
-      // Mock data
-      setProjects([
-        { id: 1, title: 'E-commerce Website', description: 'Full-stack e-commerce application', startDate: '2024-01-15', endDate: '2024-03-15', status: 'in-progress' },
-        { id: 2, title: 'Mobile App', description: 'Cross-platform mobile application', startDate: '2024-02-01', endDate: '2024-04-01', status: 'planning' }
-      ]);
+      setProjects([]);
+      setError('Failed to load projects');
     }
   };
 
@@ -147,11 +145,8 @@ const MentorDashboard = () => {
       setResources(resourcesData);
     } catch (err) {
       console.error('Error fetching resources:', err);
-      // Mock data
-      setResources([
-        { id: 1, title: 'React Guide', description: 'Complete guide to React development', type: 'document', createdAt: '2024-01-01' },
-        { id: 2, title: 'Database Design', description: 'Database design best practices', type: 'video', createdAt: '2024-01-15' }
-      ]);
+      setResources([]);
+      setError('Failed to load resources');
     }
   };
 
@@ -160,7 +155,7 @@ const MentorDashboard = () => {
     e.preventDefault();
     try {
       const createdTask = await mentorAuthAPI.createTask(newTask);
-      setTasks(prev => [...prev, { ...newTask, id: Date.now() }]);
+      setTasks(prev => [...prev, createdTask]);
       setNewTask({ title: '', description: '', dueDate: '', priority: 'medium', assignedTo: '', status: 'pending' });
       setShowTaskForm(false);
       setError('');
@@ -173,7 +168,7 @@ const MentorDashboard = () => {
     e.preventDefault();
     try {
       const updatedTask = await mentorAuthAPI.updateTask(editingTask.id, editingTask);
-      setTasks(prev => prev.map(task => task.id === editingTask.id ? editingTask : task));
+      setTasks(prev => prev.map(task => task.id === editingTask.id ? updatedTask : task));
       setEditingTask(null);
       setShowTaskForm(false);
       setError('');
@@ -196,7 +191,7 @@ const MentorDashboard = () => {
     e.preventDefault();
     try {
       const createdAssignment = await mentorAuthAPI.createAssignment(newAssignment);
-      setAssignments(prev => [...prev, { ...newAssignment, id: Date.now() }]);
+      setAssignments(prev => [...prev, createdAssignment]);
       setNewAssignment({ title: '', description: '', dueDate: '', maxScore: 100, course: '', instructions: '' });
       setShowAssignmentForm(false);
       setError('');
@@ -210,7 +205,7 @@ const MentorDashboard = () => {
     try {
       const updatedAssignment = await mentorAuthAPI.updateAssignment(editingAssignment.id, editingAssignment);
       setAssignments(prev => prev.map(assignment =>
-        assignment.id === editingAssignment.id ? editingAssignment : assignment
+        assignment.id === editingAssignment.id ? updatedAssignment : assignment
       ));
       setEditingAssignment(null);
       setShowAssignmentForm(false);
@@ -234,7 +229,7 @@ const MentorDashboard = () => {
     e.preventDefault();
     try {
       const createdProject = await mentorAuthAPI.createProject(newProject);
-      setProjects(prev => [...prev, { ...newProject, id: Date.now() }]);
+      setProjects(prev => [...prev, createdProject]);
       setNewProject({ title: '', description: '', startDate: '', endDate: '', status: 'planning' });
       setShowProjectForm(false);
       setError('');
@@ -248,7 +243,7 @@ const MentorDashboard = () => {
     try {
       const updatedProject = await mentorAuthAPI.updateProject(editingProject.id, editingProject);
       setProjects(prev => prev.map(project =>
-        project.id === editingProject.id ? editingProject : project
+        project.id === editingProject.id ? updatedProject : project
       ));
       setEditingProject(null);
       setShowProjectForm(false);
@@ -277,11 +272,11 @@ const MentorDashboard = () => {
       formData.append('type', newResource.type);
       formData.append('course', newResource.course);
       if (newResource.file) {
-        formData.append('file', newResource.file);
+        formData.append('document', newResource.file);
       }
 
       const uploadedResource = await mentorAuthAPI.uploadResource(formData);
-      setResources(prev => [...prev, { ...newResource, id: Date.now(), createdAt: new Date().toISOString() }]);
+      setResources(prev => [...prev, uploadedResource]);
       setNewResource({ title: '', description: '', type: 'document', file: null, course: '' });
       setShowResourceForm(false);
       setError('');
@@ -339,25 +334,6 @@ const MentorDashboard = () => {
       [field]: value
     }));
     if (error) setError('');
-  };
-
-  // Helper functions
-  const getPriorityBadge = (priority) => {
-    const badges = {
-      high: 'badge-high',
-      medium: 'badge-medium',
-      low: 'badge-low'
-    };
-    return badges[priority] || 'badge-medium';
-  };
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      completed: 'badge-completed',
-      'in-progress': 'badge-in-progress',
-      pending: 'badge-planning'
-    };
-    return badges[status] || 'badge-planning';
   };
 
   // Component styles
@@ -925,7 +901,7 @@ const MentorDashboard = () => {
             }}
           >
             <div style={styles.infoLabel}>Pending Reviews</div>
-            <div style={styles.infoValue}>5 submissions</div>
+            <div style={styles.infoValue}>Not available</div>
           </div>
           <div 
             style={styles.actionItem}
@@ -939,7 +915,7 @@ const MentorDashboard = () => {
             }}
           >
             <div style={styles.infoLabel}>Upcoming Deadlines</div>
-            <div style={styles.infoValue}>3 this week</div>
+            <div style={styles.infoValue}>Not available</div>
           </div>
           <div 
             style={styles.actionItem}
@@ -953,7 +929,7 @@ const MentorDashboard = () => {
             }}
           >
             <div style={styles.infoLabel}>Student Messages</div>
-            <div style={styles.infoValue}>8 unread</div>
+            <div style={styles.infoValue}>Not available</div>
           </div>
         </div>
       </div>
@@ -1661,8 +1637,6 @@ const MentorDashboard = () => {
                   style={styles.formSelect}
                 >
                   <option value="document">Document</option>
-                  <option value="video">Video</option>
-                  <option value="link">Link</option>
                   <option value="presentation">Presentation</option>
                 </select>
               </div>
@@ -1683,6 +1657,8 @@ const MentorDashboard = () => {
               <label style={styles.formLabel}>File</label>
               <input
                 type="file"
+                accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.ppt,.pptx,.xls,.xlsx"
+                required
                 onChange={(e) => setNewResource({...newResource, file: e.target.files[0]})}
                 style={styles.formInput}
               />
@@ -1738,6 +1714,7 @@ const MentorDashboard = () => {
                   <span>Type: {resource.type}</span>
                   <span>Uploaded: {new Date(resource.createdAt).toLocaleDateString()}</span>
                 </div>
+                {resource.document?.relativePath && <DocumentDownloadButton url={resource.document.relativePath}>Download</DocumentDownloadButton>}
                 <button 
                   style={{...styles.actionButton, ...styles.deleteButton, marginTop: '10px'}}
                   onClick={() => deleteResource(resource.id)}
@@ -1762,191 +1739,11 @@ const MentorDashboard = () => {
 
   const renderMentorship = () => (
     <div>
-      <h1 style={styles.contentHeader}>Mentorship Management</h1>
-      <p style={styles.subtitle}>Manage mentorship programs and relationships</p>
-
-      <div style={styles.cardsGrid}>
-        <div
-          style={styles.card}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.07)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-          }}
-        >
-          <h3>Mentorship Sessions</h3>
-          <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#4299e1' }}>
-            {assignedStudents.length * 2}
-          </p>
-          <p style={styles.userDetails}>Scheduled this month</p>
-        </div>
-        <div
-          style={styles.card}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.07)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-          }}
-        >
-          <h3>Active Mentorships</h3>
-          <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#48bb78' }}>
-            {assignedStudents.filter(s => s.status === 'active').length}
-          </p>
-          <p style={styles.userDetails}>Ongoing relationships</p>
-        </div>
-        <div
-          style={styles.card}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.07)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
-          }}
-        >
-          <h3>Mentorship Goals</h3>
-          <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#ed8936' }}>
-            85%
-          </p>
-          <p style={styles.userDetails}>Achievement rate</p>
-        </div>
-      </div>
-
-      {/* Mentorship Activities */}
-      <div
-        style={styles.userInfoCard}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = styles.userInfoCardHover.boxShadow;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = styles.userInfoCard.boxShadow;
-        }}
-      >
-        <h3 style={{ marginBottom: '20px', color: '#1a202c', fontSize: '20px' }}>
-          Mentorship Activities
-        </h3>
-        <div style={styles.quickActionsGrid}>
-          <button
-            style={{...styles.actionItem, border: 'none', backgroundColor: 'transparent', cursor: 'pointer', textAlign: 'left'}}
-            onClick={() => setShowScheduleModal(true)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = styles.actionItemHover.backgroundColor;
-              e.currentTarget.style.transform = styles.actionItemHover.transform;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = styles.actionItem.backgroundColor;
-              e.currentTarget.style.transform = 'none';
-            }}
-          >
-            <div style={styles.infoLabel}>Schedule Session</div>
-            <div style={styles.infoValue}>Next: Tomorrow 2PM</div>
-          </button>
-          <div
-            style={styles.actionItem}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = styles.actionItemHover.backgroundColor;
-              e.currentTarget.style.transform = styles.actionItemHover.transform;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = styles.actionItem.backgroundColor;
-              e.currentTarget.style.transform = 'none';
-            }}
-          >
-            <div style={styles.infoLabel}>Progress Reviews</div>
-            <div style={styles.infoValue}>3 due this week</div>
-          </div>
-          <div
-            style={styles.actionItem}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = styles.actionItemHover.backgroundColor;
-              e.currentTarget.style.transform = styles.actionItemHover.transform;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = styles.actionItem.backgroundColor;
-              e.currentTarget.style.transform = 'none';
-            }}
-          >
-            <div style={styles.infoLabel}>Feedback Pending</div>
-            <div style={styles.infoValue}>5 responses needed</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Student Mentorship Overview */}
-      <div style={styles.userInfoCard}>
-        <h3 style={{ marginBottom: '20px', color: '#1a202c', fontSize: '20px' }}>
-          Student Mentorship Overview
-        </h3>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.tableHeader}>Student Name</th>
-              <th style={styles.tableHeader}>Mentorship Status</th>
-              <th style={styles.tableHeader}>Last Session</th>
-              <th style={styles.tableHeader}>Next Session</th>
-              <th style={styles.tableHeader}>Progress</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assignedStudents.map(student => (
-              <tr key={student.id}>
-                <td style={styles.tableCell}>
-                  <div style={{ fontWeight: '600' }}>{student.name}</div>
-                  <div style={{ fontSize: '12px', color: '#718096' }}>{student.program}</div>
-                </td>
-                <td style={styles.tableCell}>
-                  <span style={{
-                    ...styles.statusBadge,
-                    ...(student.status === 'active' ? styles.badgeCompleted : styles.badgePlanning)
-                  }}>
-                    {student.status === 'active' ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td style={styles.tableCell}>
-                  {new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                </td>
-                <td style={styles.tableCell}>
-                  {new Date(Date.now() + Math.random() * 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                </td>
-                <td style={styles.tableCell}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: '60px',
-                      backgroundColor: '#e2e8f0',
-                      borderRadius: '4px',
-                      overflow: 'hidden',
-                      flex: 1
-                    }}>
-                      <div style={{
-                        width: `${student.progress || Math.floor(Math.random() * 100)}%`,
-                        backgroundColor: '#48bb78',
-                        height: '8px',
-                        borderRadius: '4px',
-                        transition: 'width 0.3s ease'
-                      }}></div>
-                    </div>
-                    <span style={{ fontSize: '12px', color: '#718096', minWidth: '35px' }}>
-                      {student.progress || Math.floor(Math.random() * 100)}%
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {assignedStudents.length === 0 && (
-          <div style={styles.emptyState}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🤝</div>
-            <h3 style={{ color: '#1a202c', marginBottom: '8px' }}>No Mentorship Relationships</h3>
-            <p>Students will appear here once mentorship relationships are established.</p>
-          </div>
-        )}
-      </div>
+      <h1 style={styles.contentHeader}>Mentorship</h1>
+      <p style={styles.subtitle}>You have {assignedStudents.length} assigned students.</p>
+      <p>Session scheduling is not yet available.</p>
     </div>
   );
-
   const renderProfile = () => (
     <div>
       <h1 style={styles.contentHeader}>Mentor Profile</h1>
@@ -1972,11 +1769,11 @@ const MentorDashboard = () => {
             </div>
             <div style={styles.infoItem}>
               <div style={styles.infoLabel}>Specialization</div>
-              <div style={styles.infoValue}>{userData.specialization || 'Computer Science'}</div>
+              <div style={styles.infoValue}>{userData.specialization || 'Not specified'}</div>
             </div>
             <div style={styles.infoItem}>
               <div style={styles.infoLabel}>Assigned Programs</div>
-              <div style={styles.infoValue}>{userData.programs?.join(', ') || 'All Programs'}</div>
+              <div style={styles.infoValue}>{userData.programs?.join(', ') || 'Not specified'}</div>
             </div>
             <div style={styles.infoItem}>
               <div style={styles.infoLabel}>Students Assigned</div>
@@ -1999,17 +1796,24 @@ const MentorDashboard = () => {
 
       <div style={styles.form}>
         <h3>Edit Profile Information</h3>
-        <form onSubmit={(e) => {
+        {profileMessage && <p role="status">{profileMessage}</p>}
+        <form onSubmit={async (e) => {
           e.preventDefault();
-          // Handle profile update logic here
-          console.log('Updating profile:', editingProfile);
-          setEditingProfile(null);
+          try {
+            const data = { ...userData, ...editingProfile };
+            const profile = await mentorAuthAPI.updateProfile({ name: data.name, email: data.email, specialization: data.specialization || '', bio: data.bio || '' });
+            setUserData(profile);
+            tokenManager.setStoredUser(profile);
+            setEditingProfile(null);
+            setProfileMessage('Profile updated.');
+            setError('');
+          } catch { setProfileMessage('Unable to update profile.'); }
         }}>
           <div style={styles.formGroup}>
             <label style={styles.formLabel}>Full Name *</label>
             <input
               type="text"
-              value={editingProfile?.name || userData?.name || ''}
+              value={editingProfile?.name ?? userData?.name ?? ''}
               onChange={(e) => setEditingProfile({...editingProfile, name: e.target.value})}
               style={styles.formInput}
               required
@@ -2020,7 +1824,7 @@ const MentorDashboard = () => {
             <label style={styles.formLabel}>Email *</label>
             <input
               type="email"
-              value={editingProfile?.email || userData?.email || ''}
+              value={editingProfile?.email ?? userData?.email ?? ''}
               onChange={(e) => setEditingProfile({...editingProfile, email: e.target.value})}
               style={styles.formInput}
               required
@@ -2031,7 +1835,7 @@ const MentorDashboard = () => {
             <label style={styles.formLabel}>Specialization</label>
             <input
               type="text"
-              value={editingProfile?.specialization || userData?.specialization || ''}
+              value={editingProfile?.specialization ?? userData?.specialization ?? ''}
               onChange={(e) => setEditingProfile({...editingProfile, specialization: e.target.value})}
               style={styles.formInput}
               placeholder="e.g., Computer Science, Data Science"
@@ -2041,7 +1845,7 @@ const MentorDashboard = () => {
           <div style={styles.formGroup}>
             <label style={styles.formLabel}>Bio</label>
             <textarea
-              value={editingProfile?.bio || userData?.bio || ''}
+              value={editingProfile?.bio ?? userData?.bio ?? ''}
               onChange={(e) => setEditingProfile({...editingProfile, bio: e.target.value})}
               style={styles.formTextarea}
               placeholder="Brief description about yourself..."
@@ -2075,9 +1879,6 @@ const MentorDashboard = () => {
         </div>
       );
     }
-    if (error) {
-      return <div style={styles.error}>{error}</div>;
-    }
     const tabRenderers = {
       'dashboard-pane': renderDashboard,
       'students-pane': renderStudents,
@@ -2085,6 +1886,7 @@ const MentorDashboard = () => {
       'assignments-pane': renderAssignments,
       'projects-pane': renderProjects,
       'resources-pane': renderResources,
+      'mentorship-pane': renderMentorship,
       'profile-pane': renderProfile,
       'updateprofile-pane': renderUpdateProfile
     };
@@ -2204,10 +2006,10 @@ const MentorDashboard = () => {
           </div>
           <div>
             <h1 style={styles.welcomeText}>
-              {userData?.name || 'Loading Profile...'}
+              {[userData?.name, userData?.surname].filter(Boolean).join(' ') || 'Loading Profile...'}
             </h1>
             <p style={styles.userInfo}>
-              Mentor • {userData?.specialization || 'Computer Science'}
+              Mentor • {userData?.specialization || 'Not specified'}
             </p>
             <p style={styles.userDetails}>
               Students: {assignedStudents.length}
@@ -2258,6 +2060,7 @@ const MentorDashboard = () => {
         </button>
       </div>
       <div style={styles.mainContent}>
+        {error && <div role="alert" style={styles.error}>{error} <button type="button" onClick={() => setError('')}>Dismiss</button></div>}
         {renderTabContent()}
       </div>
     </div>

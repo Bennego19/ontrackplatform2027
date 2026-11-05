@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { tokenManager } from "../services/authMiddleware";
+import DocumentDownloadButton from './DocumentDownloadButton';
 import "./OnboardStudent.css";
 
 export default function ManageResources() {
@@ -18,13 +18,11 @@ export default function ManageResources() {
   const [programs, setPrograms] = useState([]);
   const [tracks, setTracks] = useState([]);
   const [updateFormData, setUpdateFormData] = useState({});
-  const [deleteId, setDeleteId] = useState("");
   const [errors, setErrors] = useState([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const navigate = useNavigate();
 
   // Helper: extract field-specific errors
   function getFieldError(fieldName) {
@@ -298,6 +296,8 @@ export default function ManageResources() {
     loadResources();
     loadPrograms();
     loadTracks();
+    // Load once on mount; subsequent changes explicitly refresh resources.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -524,7 +524,7 @@ export default function ManageResources() {
                             <td>{resource.description}</td>
                             <td>
                               {resource.websiteLink && <a href={resource.websiteLink} target="_blank" rel="noopener noreferrer">{resource.websiteLink}</a>}
-                              {resource.document && <a href={`http://localhost:3001${resource.document.relativePath}`} target="_blank" rel="noopener noreferrer">{resource.document.fileName}</a>}
+                              {resource.document?.relativePath && <DocumentDownloadButton url={resource.document.relativePath}>{resource.document.fileName}</DocumentDownloadButton>}
                             </td>
                             <td>{resource.program}</td>
                             <td>{resource.track}</td>

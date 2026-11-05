@@ -5,13 +5,21 @@ node_modules/
 # Backend
 BACKEND/uploads/*
 BACKEND/.env*
-BACKEND/package-lock.json
 BACKEND/keys/
 
 # Frontend
-ontrackapp/.env.production
-ontrackapp/package-lock.json
+ontrackapp/.env*
+!ontrackapp/.env.example
+ontrackapp/build/
 
 # General
 *.log
 .DS_Store
+
+# Database exports and local backup configuration can contain credentials or
+# personal data. Keep them outside the repository even with these safeguards.
+dump/
+*.bson
+*.bson.gz
+*.archive.gz
+atlas-backup.yaml

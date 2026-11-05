@@ -18,19 +18,21 @@ import { fileURLToPath } from 'url';
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 import { getDatabase, getConnectionStatus, initializeDatabase, closeDatabase } from './db/conn.mjs';
+import { allowedCorsOrigins } from './utils/corsOrigins.mjs';
+import { logError } from './utils/logError.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const uploadsDir = path.join(__dirname, 'uploads');
-
-// Create directory if it doesn't exist
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log('✅ Uploads directory created');
-}
-
 dotenv.config();
+
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || Buffer.byteLength(process.env.JWT_SECRET, 'utf8') < 32 || process.env.JWT_SECRET === 'ontrack-connect-jwt-secret-key-2024')) {
+  throw new Error('Production requires a unique JWT_SECRET of at least 32 bytes');
+}
+if (process.env.NODE_ENV === 'production' && !process.env.DB_NAME?.trim()) {
+  console.error('Production requires an explicit DB_NAME');
+  throw new Error('Production requires an explicit DB_NAME');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -53,19 +55,12 @@ const checkDatabaseConnection = async () => {
         console.log('✅ Database connection: CONNECTED');
         console.log(`📊 Database name: ${dbInstance.databaseName}`);
         
-        // List collections
-        const collections = await dbInstance.listCollections().toArray();
-        console.log(`📁 Collections found: ${collections.length}`);
-        collections.forEach(col => {
-          console.log(`   - ${col.name}`);
-        });
-        
         return true;
       }
     }
   } catch (error) {
     dbConnectionStatus = 'ERROR';
-    console.error('❌ Database connection error:', error.message);
+    logError('Database connection error:', error);
     return false;
   }
   return false;
@@ -73,7 +68,7 @@ const checkDatabaseConnection = async () => {
 
 app.use((req, res, next) => {
   req.requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-  console.log(`[${req.requestId}] ${req.method} ${req.originalUrl}`, {
+  console.log(`[${req.requestId}] ${req.method}`, {
     user: req.headers.authorization ? 'authenticated' : 'anonymous',
     timestamp: new Date().toISOString()
   });
@@ -91,17 +86,7 @@ app.use((req, res, next) => {
 });
 
 // CORS Configuration - UPDATED for Render compatibility
-const allowedOrigins = [
-  'https://platform.ontrackconnect.co.za',
-  'https://platformontrackconnect.co.za',
-  'https://ontrackplatform2026-5.onrender.com',
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
-  'http://localhost:3003',
-  'http://localhost:5173',
-  'http://localhost:8080'
-];
+const allowedOrigins = allowedCorsOrigins();
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -109,25 +94,19 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) === -1) {
-      console.warn('CORS blocked origin:', origin);
-      return callback(new Error(`CORS policy: ${origin} not allowed`), false);
+      console.warn('CORS blocked a request from an unapproved origin');
+      return callback(new Error('CORS policy: origin not allowed'), false);
     }
     return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Request-ID']
 }));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-  next();
-});
+app.use(express.json({ limit: '256kb' }));
+app.use(express.urlencoded({ extended: true, limit: '256kb' }));
 
 // Security middleware
 app.use(mongoSanitize());
@@ -139,8 +118,6 @@ app.use(helmet({
 app.use(helmet.frameguard({
   action: "deny",
 }));
-
-app.use('/uploads', express.static('uploads'));
 
 // Serve frontend admin login as landing page if available
 const frontendDir = path.join(__dirname, '..', 'frontend html');
@@ -169,6 +146,9 @@ import accesscontrol from './routes/accesscontrol.mjs';
 import adminlogin from './routes/adminlogin.mjs';
 import addtask from './routes/addtask.mjs';
 import helpRequests from './routes/help-requests.mjs';
+import files from './routes/files.mjs';
+import passwordReset from './routes/passwordReset.mjs';
+import { routePolicy } from './middleware/routePolicy.mjs';
 
 // Mount the routes with logging
 const routes = [
@@ -195,12 +175,14 @@ const routes = [
   { path: '/api/projects', router: projects, name: 'Projects' },
   { path: '/api/announcements', router: announcements, name: 'Announcements' },
   { path: '/api/addtask', router: addtask, name: 'Add Task' },
-  { path: '/api/help-requests', router: helpRequests, name: 'Help Requests' }
+  { path: '/api/help-requests', router: helpRequests, name: 'Help Requests' },
+  { path: '/api/files', router: files, name: 'Files' },
+  { path: '/api/password-reset', router: passwordReset, name: 'Password Reset' }
 ];
 
 // Mount all routes with logging
 routes.forEach(route => {
-  app.use(route.path, route.router);
+  app.use(route.path, routePolicy(route.path), route.router);
   console.log(`✅ Route mounted: ${route.path} (${route.name})`);
 });
 
@@ -223,33 +205,13 @@ app.get('/', (req, res) => {
 });
 
 // Test route with connection status
-app.get('/api/test', (req, res) => {
-  res.json({ 
-    message: 'Server is working!',
-    status: 'OK',
-    database: dbConnectionStatus,
-    server: serverStatus,
-    timestamp: new Date().toISOString()
-  });
-});
+app.get('/api/test', (req, res) => res.status(404).json({ error: 'Route not found' }));
 
 // Simple test endpoint for Render
-app.get('/api/test-simple', (req, res) => {
-  res.json({ 
-    message: 'Backend API is working!',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      health: 'GET /api/health',
-      status: 'GET /api/status',
-      test: 'GET /api/test',
-      welcome: 'GET /api/welcome'
-    }
-  });
-});
+app.get('/api/test-simple', (req, res) => res.status(404).json({ error: 'Route not found' }));
 
 // Welcome route with logging
 app.get('/api/welcome', (req, res) => {
-  console.log(`📥 Request received: ${req.method} ${req.path} from ${req.headers.origin}`);
   res.json({ 
     message: 'Welcome to the API Service!',
     status: {
@@ -281,6 +243,15 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Status endpoint
+app.get('/api/ready', async (req, res) => {
+  try {
+    await getDatabase();
+    res.json({ status: 'ready' });
+  } catch {
+    res.status(503).json({ status: 'not_ready' });
+  }
+});
+
 app.get('/api/status', (req, res) => {
   const connStatus = getConnectionStatus();
   res.json({
@@ -304,7 +275,7 @@ app.get('/api/status', (req, res) => {
 app.use('*', (req, res) => {
   res.status(404).json({ 
     error: 'Route not found',
-    path: req.originalUrl,
+    path: req.path,
     method: req.method,
     availableRoutes: [
       'GET  /api/health',
@@ -319,15 +290,11 @@ app.use('*', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('🚨 Server Error:', err.stack);
+  logError('Server error:', err);
   
   // Handle CORS errors
-  if (err.message.includes('CORS')) {
-    return res.status(403).json({ 
-      error: 'CORS Error',
-      message: err.message,
-      allowedOrigins: allowedOrigins
-    });
+  if (err.message?.includes('CORS')) {
+    return res.status(403).json({ error: 'CORS Error' });
   }
   
   res.status(err.status || 500).json({ 
@@ -383,11 +350,11 @@ const startServer = async () => {
               await initializeDatabase();
               console.log('✅ Database reconnected');
             } catch (reconnectError) {
-              console.error('❌ Database reconnection failed:', reconnectError.message);
+              logError('Database reconnection failed:', reconnectError);
             }
           }
         } catch (error) {
-          console.error(`❌ Database monitor error: ${error.message}`);
+          logError('Database monitor error:', error);
         }
       }, 60000); // Every 60 seconds
       
@@ -398,7 +365,7 @@ const startServer = async () => {
     // Handle server errors
     server.on('error', (error) => {
       serverStatus = 'ERROR';
-      console.error('❌ Server error:', error);
+      logError('Server error:', error);
       
       if (error.code === 'EADDRINUSE') {
         console.error(`Port ${PORT} is already in use. Try a different port.`);
@@ -444,7 +411,7 @@ const startServer = async () => {
     return server;
     
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logError('Failed to start server:', error);
     process.exit(1);
   }
 };

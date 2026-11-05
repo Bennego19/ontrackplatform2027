@@ -5,7 +5,6 @@ import { authAPI, tokenManager } from "../services/authMiddleware";
 import DocumentViewer from './DocumentViewer';
 
 const UserDashboard = () => {
-  console.log('UserDashboard: rendering component');
   // State management
 
   const navigate = useNavigate();
@@ -30,29 +29,17 @@ const UserDashboard = () => {
   const [selectedResource, setSelectedResource] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
-  const [documentContent, setDocumentContent] = useState(null);
-  const [documentContentLoading, setDocumentContentLoading] = useState(false);
-  const [documentContentError, setDocumentContentError] = useState(null);
   const [notices, setNotices] = useState([]);
   const [noticesLoading, setNoticesLoading] = useState(false);
   const [selectedNotice, setSelectedNotice] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleString());
   const [helpRequests, setHelpRequests] = useState([]);
   const [helpRequestsLoading, setHelpRequestsLoading] = useState(false);
   const [newHelpRequest, setNewHelpRequest] = useState({ title: '', description: '', category: 'Technical' });
   const [submittingHelpRequest, setSubmittingHelpRequest] = useState(false);
   const [helpRequestError, setHelpRequestError] = useState('');
-  const [initialLoading, setInitialLoading] = useState(true);
 
-  // Real-time clock effect
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleString());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -80,61 +67,13 @@ const UserDashboard = () => {
   const closeDocumentModal = () => {
     setIsModalOpen(false);
     setSelectedDocument(null);
-    setDocumentContent(null);
-    setDocumentContentError(null);
-    setDocumentContentLoading(false);
   };
-
-  useEffect(() => {
-    // When a document is selected and it's a plain-text type, fetch its content so we can render it.
-    const fetchIfText = async () => {
-      if (!selectedDocument) return;
-      const getExt = (url) => {
-        try {
-          const u = new URL(url, window.location.origin);
-          const parts = u.pathname.split('.');
-          return parts.length > 1 ? parts.pop().toLowerCase() : '';
-        } catch (e) {
-          const parts = url.split('.');
-          return parts.length > 1 ? parts.pop().toLowerCase() : '';
-        }
-      };
-
-      const ext = getExt(selectedDocument);
-      const textExts = ['txt', 'md', 'csv', 'log', 'json'];
-      if (!textExts.includes(ext)) {
-        setDocumentContent(null);
-        return;
-      }
-
-      setDocumentContentLoading(true);
-      setDocumentContentError(null);
-      try {
-        const headers = {};
-        const token = tokenManager.getToken();
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        const absoluteUrl = selectedDocument.startsWith('http') ? selectedDocument : window.location.origin + selectedDocument;
-
-        const resp = await fetch(absoluteUrl, { headers });
-        if (!resp.ok) throw new Error(`Failed to load document (${resp.status})`);
-        const text = await resp.text();
-        setDocumentContent(text);
-      } catch (err) {
-        console.error('Error fetching document content:', err);
-        setDocumentContentError(err.message || String(err));
-      } finally {
-        setDocumentContentLoading(false);
-      }
-    };
-
-    fetchIfText();
-  }, [selectedDocument]);
 
   const fetchNotices = async () => {
     setNoticesLoading(true);
     try {
-      const resp = await axios.get('/api/announcements');
+      const token = tokenManager.getToken();
+      const resp = await axios.get('/api/announcements', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       setNotices(resp.data || []);
     } catch (err) {
       console.error('Error fetching notices:', err);
@@ -160,13 +99,6 @@ const UserDashboard = () => {
   ];
 
   // Helper functions
-  const getCurrentSemester = (registrationDate) => {
-    if (!registrationDate) return "Not specified";
-    const date = new Date(registrationDate);
-    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-  };
-
   const transformUserData = (backendData) => {
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const registrationMonth = backendData.createdAt ?
@@ -178,24 +110,13 @@ const UserDashboard = () => {
       email: backendData.email,
       program: backendData.program,
       track: backendData.track,
-      semester: getCurrentSemester(backendData.createdAt),
+      semester: backendData.semester || 'Not specified',
       registrationMonth: registrationMonth,
       studentId: backendData.username,
-      cohort: `${backendData.program} ${new Date().getFullYear()}`,
-      startDate: "March 1",
+      cohort: backendData.cohort || 'Not specified',
+      startDate: backendData.startDate || 'Not specified',
       cellnumber: backendData.cellnumber || "Not provided"
     };
-  };
-
-  // Helpers to normalize assessment item fields for display
-  const getName = (item) => {
-    if (!item) return '';
-    return item.name || item.assessmentname || item.title || item._id || '';
-  };
-
-  const getDescription = (item) => {
-    if (!item) return '';
-    return item.description || item.instructions || item.summary || item.assessmentname || '';
   };
 
   // Fetch assigned mentor
@@ -225,11 +146,10 @@ useEffect(() => {
   const initializeAuth = () => {
     const token = tokenManager.getToken();
     const storedUser = tokenManager.getStoredUser();
-    console.log('UserDashboard initializeAuth:', { tokenExists: !!token, storedUser });
     if (token && storedUser) {
       setUserData(storedUser);
       setIsAuthenticated(true);
-      // fetchUserData(); // Temporarily commented out to prevent immediate logout if profile fetch fails
+      fetchUserData();
       fetchUserResources();
       fetchUserTasks();
       fetchUserModules();
@@ -242,6 +162,8 @@ useEffect(() => {
 
   };
   initializeAuth();
+  // Restore and load the current session once when the dashboard mounts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
 
   // Auto-refresh data every 30 seconds when authenticated
@@ -249,7 +171,6 @@ useEffect(() => {
     let refreshInterval;
     if (isAuthenticated) {
       refreshInterval = setInterval(() => {
-        console.log('Auto-refreshing dashboard data...');
         fetchUserResources();
         fetchUserTasks();
         fetchUserModules();
@@ -360,7 +281,7 @@ const handleSubmitHelpRequest = async (e) => {
   setSubmittingHelpRequest(true);
   setHelpRequestError('');
   try {
-    await authAPI.createHelpRequest(newHelpRequest);
+    await authAPI.createHelpRequest({ topic: newHelpRequest.title, area: newHelpRequest.category, description: newHelpRequest.description });
     setNewHelpRequest({ title: '', description: '', category: 'Technical' });
     await fetchHelpRequests(); // Refresh the list
   } catch (err) {
@@ -635,7 +556,7 @@ await fetchAssignedMentor();
       padding: '18px 24px',
       borderRadius: '16px',
       border: 'none',
-      backgroundColor: 'transparent',
+      background: 'transparent',
       cursor: 'pointer',
       transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
       fontSize: '16px',
@@ -657,7 +578,7 @@ await fetchAssignedMentor();
       transition: 'left 0.5s'
     },
     navTabHover: {
-      backgroundColor: '#f8fafc',
+      background: '#f8fafc',
       color: '#1a202c',
       transform: 'translateX(6px) scale(1.02)',
       boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)'
@@ -1079,7 +1000,8 @@ await fetchAssignedMentor();
       'Internship Program': `The OnTrack Connect Internship Program is a structured initiative aimed at providing students with real-world industry exposure in short-term, supervised roles. Each internship is designed to align with a student's specific tech skills and career goals, enabling them to apply what they've learned in practical environments. Participants are matched with companies, mentors, or project leads who provide guidance and evaluate progress throughout the experience. The program goes beyond just technical work—it focuses on building well-rounded, work-ready individuals. Interns engage in weekly progress check-ins, collaborative tasks, and feedback sessions to encourage growth and reflection. They also receive training in communication, time management, and workplace etiquette through soft skills workshops. As part of the journey, students begin building a verified portfolio, gain valuable industry references, and experience the realities of teamwork in professional settings. This not only builds confidence and credibility but also prepares them for long-term success. The internship serves as a vital bridge between education and employment—turning learning into lasting opportunity.`,
       'Graduate Program': `A personalised, project-driven accelerator for graduates ready to launch their tech careers. Work on two real-world projects with senior mentor guidance, sharpening your technical mastery and professional presence. OnTrack Connect is excited to announce its Software Graduate Program, launching in 2026, designed to equip aspiring developers with cutting-edge skills in Python, Java, and React. This comprehensive program offers hands-on training, enabling participants to work alongside industry professionals while building a robust portfolio. Focused on both technical and leadership development, the initiative prepares graduates for meaningful achievements in the tech sector. Supported by IT Varsity, the program emphasizes a bright future for its participants, combining practical experience with career growth opportunities. Participants will benefit from a structured curriculum that covers in-demand technologies, fostering expertise in software development. The program also prioritizes leadership skills, ensuring graduates are well-rounded and ready for real-world challenges. By joining OnTrack Connect, students gain access to a network of professionals and resources that enhance their employability, creating a professional portfolio, deep technical experience, and the confidence to stand out in competitive job markets.`
     };
-    return descriptions[program] || 'Program description not available.';
+    const descriptionKey = program === 'Skill Development Program' ? 'Skills Development Program' : program;
+    return descriptions[descriptionKey] || 'Program description not available.';
   };
 
   const getTrackDescription = (track) => {
@@ -2510,6 +2432,7 @@ const renderProjects = () => {
           Submit a New Help Request
         </h3>
         <form onSubmit={handleSubmitHelpRequest} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {helpRequestError && <p role="alert">{helpRequestError}</p>}
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#4a5568' }}>
               Title
@@ -2607,7 +2530,7 @@ const renderProjects = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {helpRequests.map((request) => (
               <div
-                key={request._id}
+                key={request.id || request._id}
                 style={{
                   padding: '20px',
                   border: '1px solid #e2e8f0',
@@ -2616,7 +2539,7 @@ const renderProjects = () => {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <h4 style={{ margin: 0, color: '#1a202c', fontSize: '18px' }}>{request.title}</h4>
+                  <h4 style={{ margin: 0, color: '#1a202c', fontSize: '18px' }}>{request.topic || request.title}</h4>
                   <span style={{
                     padding: '4px 12px',
                     borderRadius: '20px',
@@ -2629,7 +2552,7 @@ const renderProjects = () => {
                   </span>
                 </div>
                 <p style={{ margin: '8px 0', color: '#4a5568', fontSize: '14px' }}>
-                  <strong>Category:</strong> {request.category}
+                  <strong>Category:</strong> {request.area || request.category}
                 </p>
                 <p style={{ margin: '8px 0', color: '#4a5568', lineHeight: '1.5' }}>
                   {request.description}
@@ -2813,6 +2736,7 @@ const renderProjects = () => {
           {navigationTabs.map((tab) => (
             <button
               key={tab.id}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
               onClick={() => {
                 setActiveTab(tab.id);
                 if (isMobile) setIsMobileSidebarOpen(false);
@@ -2823,13 +2747,13 @@ const renderProjects = () => {
               }}
               onMouseEnter={(e) => {
                 if (activeTab !== tab.id) {
-                  e.target.style.backgroundColor = styles.navTabHover.backgroundColor;
+                  e.target.style.background = styles.navTabHover.background;
                   e.target.style.color = styles.navTabHover.color;
                 }
               }}
               onMouseLeave={(e) => {
                 if (activeTab !== tab.id) {
-                  e.target.style.backgroundColor = styles.navTab.backgroundColor;
+                  e.target.style.background = styles.navTab.background;
                   e.target.style.color = styles.navTab.color;
                 }
               }}

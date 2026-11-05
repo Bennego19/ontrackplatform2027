@@ -9,10 +9,15 @@ import { authAPI } from '../services/authMiddleware';
 const HelpRequests = () => {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState(null);
 
   // Fetch help requests data
-  const { data: helpRequestsData, loading: helpRequestsLoading, error: helpRequestsError } = useDashboardApi('/help-requests/admin');
+  const { data: helpRequestsData, loading: helpRequestsLoading, error: helpRequestsError, refetch } = useDashboardApi(isAuthenticated ? '/help-requests/admin' : null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const interval = setInterval(refetch, 60000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, refetch]);
 
   // Check authentication on component mount
   useEffect(() => {
@@ -22,9 +27,8 @@ const HelpRequests = () => {
         if (token) {
           // Verify token with backend
           const response = await authAPI.verifyToken();
-          if (response.success) {
+          if (response.success && ['admin', 'superadmin'].includes(response.user?.role)) {
             setIsAuthenticated(true);
-            setUserData(response.user);
           } else {
             tokenManager.removeToken();
             setIsAuthenticated(false);
@@ -42,8 +46,7 @@ const HelpRequests = () => {
 
   // Handle login success from AdminLogin component
   const handleLoginSuccess = (response) => {
-    setIsAuthenticated(true);
-    setUserData(response.user);
+    setIsAuthenticated(['admin', 'superadmin'].includes(response.user?.role));
     tokenManager.setToken(response.token);
   };
 
@@ -51,7 +54,6 @@ const HelpRequests = () => {
   const handleLogout = () => {
     tokenManager.removeToken();
     setIsAuthenticated(false);
-    setUserData(null);
     navigate('/');
   };
 
@@ -163,6 +165,7 @@ const HelpRequests = () => {
           <p className="loading-text">Loading help requests...</p>
         </div>
       )}
+      {helpRequestsError && <p role="alert">{helpRequestsError}</p>}
 
       <div className="dashboard-content">
         {/* Help Requests Management Section */}

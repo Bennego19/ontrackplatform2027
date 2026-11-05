@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { tokenManager } from "../services/authMiddleware";
+import { studentTracks as tracks } from '../config/studentTracks';
 import "./managementor.css";
 
 export default function ManageSkillDevelopment() {
@@ -22,25 +22,8 @@ export default function ManageSkillDevelopment() {
   });
 
   const [updateFormData, setUpdateFormData] = useState({});
-  const [deleteId, setDeleteId] = useState("");
-
-  const navigate = useNavigate();
 
   const assessmentTypes = ["task", "assignment", "project", "module"];
-  const tracks = ["webdev", "java", "csharp", "python"];
-  const programs = [
-    { name: "Mentorship Program" },
-    { name: "Internship Program" },
-    { name: "Skill Development Program" },
-    { name: "Graduate Program" }
-  ];
-
-  // Helper: extract field-specific errors
-  function getFieldError(fieldName) {
-    const err = errors.find(e => e.field === fieldName);
-    return err ? err.message : "";
-  }
-
   const showMessage = (text, type = "success") => {
     if (type === "success") {
       setSuccessMessage(text);
@@ -81,7 +64,7 @@ export default function ManageSkillDevelopment() {
 
     try {
       const token = tokenManager.getToken();
-      const response = await axios.post("/api/assessments", data, {
+      await axios.post("/api/assessments", data, {
         headers: {
           "Content-Type": "multipart/form-data",
           Authorization: `Bearer ${token}`
@@ -118,7 +101,7 @@ export default function ManageSkillDevelopment() {
       const response = await axios.get("/api/assessments", {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setAssessments(Array.isArray(response.data) ? response.data : []);
+      setAssessments(Array.isArray(response.data) ? response.data.filter(item => item.program === 'Skill Development Program') : []);
     } catch (error) {
       console.error("Error loading assessments:", error);
       setAssessments([]);
@@ -151,17 +134,14 @@ export default function ManageSkillDevelopment() {
 
   const updateAssessment = async (id) => {
     try {
-      const originalAssessment = updateAssessments.find(a => (a.id || a._id) === id || getId(a) === id);
       const assessmentData = updateFormData[id] || {};
-      // Merge original data with changes to ensure all fields are preserved
       const dataToSend = {
-        ...originalAssessment,
         ...assessmentData,
         program: "Skill Development Program"
       };
 
       const token = tokenManager.getToken();
-      await axios.put(`/api/assessments/${id}`, dataToSend, {
+      await axios.patch(`/api/assessments/${id}`, dataToSend, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

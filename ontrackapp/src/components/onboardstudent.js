@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import "./OnboardStudent.css";
 import { tokenManager } from '../services/authMiddleware';
-import { authAPI } from "../services/authMiddleware";
+import { studentTracks } from '../config/studentTracks';
 
 export default function ManageStudents() {
   const [activeTab, setActiveTab] = useState("create");
@@ -31,9 +30,8 @@ export default function ManageStudents() {
   const [loading, setLoading] = useState(false);
   // Search state for filtering students in read and delete tabs
   const [searchTerm, setSearchTerm] = useState("");
+  const [resetLink, setResetLink] = useState('');
 
-  // Navigation hook for potential redirects after actions
-  const navigate = useNavigate();
 
   // Helper: extract field-specific errors
   function getFieldError(fieldName) {
@@ -73,16 +71,7 @@ export default function ManageStudents() {
     { _id: "4", name: "Graduate Program" }
   ];
 
-  const tracks = [
-    { _id: "1", name: "Web Development" },
-    { _id: "2", name: "Java Programming" },
-    { _id: "3", name: "C# Programming" },
-    { _id: "4", name: "Python Programming" },
-    { _id: "5", name: "Robotics" },
-    { _id: "6", name: "Compukids" },
-    { _id: "7", name: "CompuTeens" },
-    { _id: "8", name: "Digital Entrepreneurship" }
-  ];
+  const tracks = studentTracks.map((name, index) => ({ _id: String(index + 1), name }));
 
   // Validation functions
   const validateEmail = (email) => {
@@ -107,7 +96,7 @@ export default function ManageStudents() {
     formData.program &&
     formData.track &&
     formData.username.trim() &&
-    formData.password.trim();
+    formData.password.trim().length >= 12;
 
     // Handle create student form submission
     // We use async/await for cleaner asynchronous code and better error handling
@@ -200,6 +189,18 @@ export default function ManageStudents() {
     } catch (error) {
       showMessage("Network error loading students.", "error");
     }
+  };
+
+  const createResetLink = async id => {
+    setResetLink('');
+    try {
+      const response = await fetch(`/api/password-reset/issue/${id}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${tokenManager.getToken()}` }, cache: 'no-store'
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Unable to create reset link');
+      setResetLink(`${window.location.origin}/reset-password#${data.token}`);
+    } catch (error) { showMessage(error.message || 'Unable to create reset link', 'error'); }
   };
 
   // UPDATE STUDENT
@@ -326,6 +327,8 @@ export default function ManageStudents() {
 
   useEffect(() => {
     loadStudents();
+    // Load once on mount; tab actions explicitly refresh the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -339,6 +342,11 @@ export default function ManageStudents() {
 
         {/* SUCCESS MESSAGE */}
         {successMessage && <div className="success-message">{successMessage}</div>}
+        {resetLink && <div className="success-message"><label>Single-use reset link (expires in 15 minutes)
+          <input aria-label="Student password reset link" type="text" readOnly value={resetLink} onFocus={event => event.target.select()} />
+        </label><p>Share this link securely with the student. Creating another link invalidates this one.</p>
+          <button type="button" onClick={() => setResetLink('')}>Dismiss</button>
+        </div>}
 
         {/* GENERAL ERRORS */}
         {errors.some(e => e.field === "general") && (
@@ -474,6 +482,7 @@ export default function ManageStudents() {
                           <label className="form-label">Password *</label>
                           <input
                             type="password"
+                            minLength={12}
                             className={`form-input ${getFieldError("password") ? "error" : ""}`}
                             placeholder="Enter Password"
                             value={formData.password}
@@ -582,7 +591,7 @@ export default function ManageStudents() {
                           <th>Program</th>
                           <th>Track</th>
                           <th>Username</th>
-                          <th>Password</th>
+                          <th>Account recovery</th>
                           <th>Access Allowed</th>
                         </tr>
                       </thead>
@@ -596,7 +605,7 @@ export default function ManageStudents() {
                             <td>{student.program || 'N/A'}</td>
                             <td>{student.track || 'N/A'}</td>
                             <td>{student.username || 'N/A'}</td>
-                            <td>••••••••</td>
+                            <td><button type="button" onClick={() => createResetLink(student._id || student.id)} aria-label={`Reset password for ${student.username}`}>Create reset link</button></td>
                             <td>{student.accessAllowed || 'N/A'}</td>
                           </tr>
                         ))}

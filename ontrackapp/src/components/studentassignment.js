@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { tokenManager } from '../services/authMiddleware';
+import { studentTracks } from '../config/studentTracks';
 import "./StudentAssignment.css"; // We'll create this CSS file
 
 export default function StudentAssignment() {
@@ -18,6 +19,8 @@ export default function StudentAssignment() {
 
   useEffect(() => {
     fetchAllData();
+    // Load once when this screen opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAllData = async () => {
@@ -29,17 +32,9 @@ export default function StudentAssignment() {
         { _id: "1", name: "Mentorship Program" },
         { _id: "2", name: "Internship Program" },
         { _id: "3", name: "Skill Development Program" },
+        { _id: "4", name: "Graduate Program" },
       ]);
-      setTracks([
-        { _id: "1", name: "Web Development" },
-        { _id: "2", name: "Java Programming" },
-        { _id: "3", name: "C# Programming" },
-        { _id: "4", name: "Python Programming" },
-        { _id: "5", name: "Robotics" },
-        { _id: "6", name: "Compukids" },
-        { _id: "7", name: "CompuTeens" },
-        { _id: "8", name: "Digital Entrepreneurship" },
-      ]);
+      setTracks(studentTracks.map((name, index) => ({ _id: String(index + 1), name })));
     } catch (error) {
       showMessage("Failed to load data. Please refresh the page.", "error");
     } finally {
@@ -49,10 +44,11 @@ export default function StudentAssignment() {
 
   const fetchStudents = async () => {
     try {
-      const res = await axios.get("/api/onboardstudents/");
+      const res = await axios.get("/api/onboardstudents/", { headers: { Authorization: `Bearer ${tokenManager.getToken()}` } });
       setStudents(res.data);
     } catch (error) {
       console.error("Error fetching students:", error);
+      throw error;
     }
   };
 
@@ -73,8 +69,8 @@ export default function StudentAssignment() {
   };
 
   const assignStudent = async () => {
-    if (!formData.student) {
-      showMessage("Please select a student.", "error");
+    if (!formData.student || !formData.program || !formData.track) {
+      showMessage("Please select a student, program and track.", "error");
       return;
     }
 
@@ -114,7 +110,7 @@ export default function StudentAssignment() {
     setLoading(false);
   };
 
-  const isFormValid = formData.student;
+  const isFormValid = formData.student && formData.program && formData.track;
 
   return (
     <div className="assignment-container">
@@ -135,7 +131,7 @@ export default function StudentAssignment() {
           {/* Student and Program Row */}
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Select Student</label>
+              <label className="form-label">Select Student *</label>
                <select
               className="form-select"
               value={formData.student}
@@ -172,7 +168,7 @@ export default function StudentAssignment() {
           {/* Track Row */}
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Select Track</label>
+              <label className="form-label">Select Track *</label>
               <select
                 className="form-select"
                 value={formData.track}

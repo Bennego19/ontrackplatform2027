@@ -1,33 +1,11 @@
+import { logError } from '../utils/logError.mjs';
 import express from "express";
 import getDatabase from "../db/conn.mjs";
-import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
 import { ObjectId } from "mongodb";
-import { authenticateToken } from "../middleware/auth.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-
-// Create uploads directory if it doesn't exist
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadsDir),
-    filename: (req, file, cb) => {
-        const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
-        cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safe}`);
-    }
-});
-
-const upload = multer({
-    storage,
-    limits: { fileSize: 10 * 1024 * 1024 }
-});
+import { authenticateAdmin, authenticateToken } from "../middleware/auth.js";
+import { exactCaseInsensitive } from '../utils/exactMatch.mjs';
+import { contentVisibility as visibility } from '../utils/contentVisibility.mjs';
+import * as files from '../services/fileStorage.mjs';
 
 const router = express.Router();
 
@@ -40,7 +18,7 @@ router.use(async (req, res, next) => {
         req.db = await getDatabase();
         next();
     } catch (error) {
-        console.error("Database Injection Middleware Error:", error);
+        logError("Database Injection Middleware Error:", error);
         res.status(503).json({ error: "Database connection unavailable" });
     }
 });
@@ -66,11 +44,7 @@ router.get("/info", (req, res) => {
 
 const userTypeQuery = (type, user) => ({
     assessmenttype: { $regex: new RegExp(`^${type}$`, "i") },
-    $or: [
-        { program: user?.program },
-        { track: user?.track },
-        { isGeneral: true }
-    ]
+    ...visibility(user)
 });
 
 /* ========================= CRUD ========================= */
@@ -80,8 +54,9 @@ router.get("/", authenticateToken, async (req, res) => {
         const { program, track } = req.query;
         const query = {};
 
-        if (program) query.program = { $regex: new RegExp(`^${program}$`, "i") };
-        if (track) query.track = { $regex: new RegExp(`^${track}$`, "i") };
+        if (program) query.program = { $regex: exactCaseInsensitive(program) };
+        if (track) query.track = { $regex: exactCaseInsensitive(track) };
+        if (req.userType !== 'admins') Object.assign(query, visibility(req.dbUser));
 
         const results = await req.db.collection("assessments").find(query).toArray();
         res.json(results);
@@ -90,7 +65,8 @@ router.get("/", authenticateToken, async (req, res) => {
     }
 });
 
-router.post("/", authenticateToken, upload.single("document"), async (req, res) => {
+router.post("/", authenticateToken, files.parseDocument, async (req, res) => {
+    let uploaded;
     try {
         const doc = {
             assessmentname: req.body.assessmentname,
@@ -103,25 +79,20 @@ router.post("/", authenticateToken, upload.single("document"), async (req, res) 
         };
 
         if (req.file) {
-            doc.document = {
-                fileName: req.file.originalname,
-                storedFileName: req.file.filename,
-                filePath: req.file.path,
-                relativePath: `/uploads/${req.file.filename}`,
-                mimeType: req.file.mimetype,
-                fileSize: req.file.size,
-                uploadedAt: new Date()
-            };
+            uploaded = await files.store(req.db, req.file);
+            doc.document = uploaded;
         }
 
         const result = await req.db.collection("assessments").insertOne(doc);
         res.status(201).json({ message: "Assessment created", id: result.insertedId });
     } catch (error) {
+        if (uploaded) await files.remove(req.db, uploaded).catch(() => {});
         res.status(500).json({ error: "Failed to create assessment" });
     }
 });
 
-router.patch("/:id", authenticateToken, upload.single("document"), async (req, res) => {
+router.patch("/:id", authenticateToken, files.parseDocument, async (req, res) => {
+    let uploaded;
     try {
         if (!ObjectId.isValid(req.params.id)) {
             return res.status(400).json({ error: "Invalid ID" });
@@ -148,10 +119,6 @@ router.patch("/:id", authenticateToken, upload.single("document"), async (req, r
             return res.status(400).json({ message: "Validation failed", errors: validationErrors });
         }
 
-        if (req.file && current.document?.filePath && fs.existsSync(current.document.filePath)) {
-            fs.unlinkSync(current.document.filePath);
-        }
-
         const update = { updatedAt: new Date() };
         if (req.body.assessmentname !== undefined) update.assessmentname = req.body.assessmentname.trim();
         if (req.body.assessmenttype !== undefined) update.assessmenttype = req.body.assessmenttype?.toLowerCase().trim();
@@ -161,20 +128,15 @@ router.patch("/:id", authenticateToken, upload.single("document"), async (req, r
         if (req.body.datedue !== undefined) update.datedue = req.body.datedue.trim();
 
         if (req.file) {
-            update.document = {
-                fileName: req.file.originalname,
-                storedFileName: req.file.filename,
-                filePath: req.file.path,
-                relativePath: `/uploads/${req.file.filename}`,
-                mimeType: req.file.mimetype,
-                fileSize: req.file.size,
-                uploadedAt: new Date()
-            };
+            uploaded = await files.store(req.db, req.file);
+            update.document = uploaded;
         }
 
         await collection.updateOne({ _id: current._id }, { $set: update });
+        if (uploaded && current.document) await files.remove(req.db, current.document).catch(() => console.error('Failed to remove replaced file'));
         res.json({ message: "Assessment updated" });
     } catch (error) {
+        if (uploaded) await files.remove(req.db, uploaded).catch(() => {});
         res.status(500).json({ error: "Failed to update assessment" });
     }
 });
@@ -192,11 +154,8 @@ router.delete("/:id", authenticateToken, async (req, res) => {
             return res.status(404).json({ error: "Assessment not found" });
         }
 
-        if (assessment.document?.filePath && fs.existsSync(assessment.document.filePath)) {
-            fs.unlinkSync(assessment.document.filePath);
-        }
-
         await collection.deleteOne({ _id: assessment._id });
+        if (assessment.document) await files.remove(req.db, assessment.document).catch(() => console.error('Failed to remove deleted file'));
         res.json({ message: "Assessment deleted" });
     } catch (error) {
         res.status(500).json({ error: "Failed to delete assessment" });
@@ -264,7 +223,16 @@ router.get("/resources", authenticateToken, async (req, res) => {
     const results = await req.db.collection("assessments")
       .find(userTypeQuery("resource", req.dbUser))
       .toArray();
-    res.json(results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })));
+    let mentorResources = [];
+    if (req.userType === 'students' && ObjectId.isValid(req.dbUser._id)) {
+      const assignments = await req.db.collection('mentor_assignments').find({ studentId: new ObjectId(req.dbUser._id), status: 'active' }).toArray();
+      const mentorIds = assignments.map(item => item.mentorId.toString());
+      mentorResources = await req.db.collection('mentor_resources').find({ mentorId: { $in: mentorIds } }).toArray();
+    }
+    res.json([
+      ...results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })),
+      ...mentorResources.map(item => ({ _id: item._id, assessmentname: item.title, description: item.description, createdAt: item.createdAt, documentLink: item.document?.relativePath || null }))
+    ]);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch resources" });
   }
@@ -276,7 +244,7 @@ router.get("/welcome", async (req, res) => {
 
 /* ========================= DASHBOARD ENDPOINTS ========================= */
 
-router.get("/total", async (req, res) => {
+router.get("/total", authenticateAdmin, async (req, res) => {
   try {
     const total = await req.db.collection("assessments").countDocuments({});
     res.status(200).json({ total, message: "Total assessments retrieved successfully" });
@@ -285,7 +253,7 @@ router.get("/total", async (req, res) => {
   }
 });
 
-router.get("/totals-by-program", async (req, res) => {
+router.get("/totals-by-program", authenticateAdmin, async (req, res) => {
   try {
     const pipeline = [
       { $match: { program: { $exists: true, $ne: "" } } },
@@ -304,7 +272,7 @@ router.get("/totals-by-program", async (req, res) => {
   }
 });
 
-router.get("/totals-by-type", async (req, res) => {
+router.get("/totals-by-type", authenticateAdmin, async (req, res) => {
   try {
     const pipeline = [
       { $match: { assessmenttype: { $exists: true, $ne: "" } } },
@@ -323,71 +291,6 @@ router.get("/totals-by-type", async (req, res) => {
   }
 });
 
-/* ========================= FILE DOWNLOAD ========================= */
-
-router.get("/download/:id", async (req, res) => {
-    try {
-        if (!ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ error: "Invalid ID" });
-        }
-
-        const assessment = await req.db.collection("assessments").findOne({ _id: new ObjectId(req.params.id) });
-
-        if (!assessment?.document || !fs.existsSync(assessment.document.filePath)) {
-            return res.status(404).json({ error: "File not found" });
-        }
-
-        res.setHeader("Content-Type", assessment.document.mimeType);
-        res.setHeader("Content-Disposition", `attachment; filename="${assessment.document.fileName}"`);
-
-        fs.createReadStream(assessment.document.filePath).pipe(res);
-    } catch (error) {
-        res.status(500).json({ error: "Failed to download file" });
-    }
-});
-
-/* ========================= DEBUG / SEED ========================= */
-
-router.get("/debug-database-contents", async (req, res) => {
-    try {
-        const docs = await req.db.collection("assessments").find({}).toArray();
-        const byType = {};
-        docs.forEach(d => {
-            const t = d.assessmenttype || "unknown";
-            byType[t] ??= [];
-            byType[t].push({ id: d._id, name: d.assessmentname });
-        });
-
-        res.json({
-            totalDocuments: docs.length,
-            byType,
-            programs: [...new Set(docs.map(d => d.program).filter(Boolean))],
-        });
-    } catch (error) {
-        res.status(500).json({ error: "Debug failed" });
-    }
-});
-
-router.delete("/admin/delete-all", authenticateToken, async (req, res) => {
-    try {
-        if (!req.dbUser.role?.includes("admin")) {
-            return res.status(403).json({ error: "Admin access required" });
-        }
-
-        const collection = req.db.collection("assessments");
-        const assessments = await collection.find({}).toArray();
-
-        assessments.forEach(assessment => {
-            if (assessment.document?.filePath && fs.existsSync(assessment.document.filePath)) {
-                fs.unlinkSync(assessment.document.filePath);
-            }
-        });
-
-        const result = await collection.deleteMany({});
-        res.json({ message: `Successfully deleted ${result.deletedCount} assessments` });
-    } catch (error) {
-        res.status(500).json({ error: "Failed to delete all assessments" });
-    }
-});
+// Files are served by the authenticated /api/files route.
 
 export default router;
