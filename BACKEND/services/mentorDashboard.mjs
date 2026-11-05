@@ -29,7 +29,7 @@ export async function assignedStudents(mentorId) {
   const database = await db();
   const assignments = await database.collection('mentor_assignments').find({ mentorId: new ObjectId(mentorId), status: 'active' }).toArray();
   const students = await database.collection('students').find(
-    { _id: { $in: assignments.map(item => item.studentId) } },
+    { _id: { $in: assignments.map(item => item.studentId) }, isActive: { $ne: false }, accessAllowed: 'granted' },
     { projection: { name: 1, surname: 1, email: 1, program: 1, track: 1 } }
   ).toArray();
   return students.map(student => ({
@@ -42,9 +42,11 @@ export async function assignedStudents(mentorId) {
 
 export async function isAssigned(mentorId, studentId) {
   if (!ObjectId.isValid(studentId)) return false;
-  return !!await (await collection('mentor_assignments')).findOne({
+  const assignment = await (await collection('mentor_assignments')).findOne({
     mentorId: new ObjectId(mentorId), studentId: new ObjectId(studentId), status: 'active'
   });
+  if (!assignment) return false;
+  return !!await (await collection('students')).findOne({ _id: new ObjectId(studentId), isActive: { $ne: false }, accessAllowed: 'granted' }, { projection: { _id: 1 } });
 }
 
 export async function list(type, mentorId) {

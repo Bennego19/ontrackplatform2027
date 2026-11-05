@@ -7,6 +7,7 @@ import { participantLogin } from '../controllers/auth.mjs';
 import { mentorsByTrack } from '../controllers/mentorMetrics.mjs';
 import { mentorLoginLimit } from '../middleware/authRateLimit.mjs';
 import { authenticateAdmin } from '../middleware/auth.js';
+import { changeAccess } from '../controllers/accountAccess.mjs';
  // Add this import
 const router = express.Router();
 
@@ -47,6 +48,8 @@ router.post("/onboardmentor", authenticateAdmin, async(req, res) => {
       cellnumber: cellnumber.trim(),
       username: username.trim(),
       password: await bcrypt.hash(password, 12),
+      isActive: true,
+      accessAllowed: 'granted',
       createdAt: new Date(),
       lastLogin: null,
       loginAttempts: 0,
@@ -116,19 +119,9 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
   }
 });
 
-// Delete mentor - PROTECTED
-router.delete("/:id", authenticateAdmin, async(req, res) => {
-  if (!ObjectId.isValid(req.params.id)) return res.status(400).json({ message: 'Invalid ID' });
-  try {
-    const database = await db();
-    const result = await database.collection("mentors").deleteOne({ _id: new ObjectId(req.params.id) });
-    if (!result.deletedCount) return res.status(404).json({ message: 'Mentor not found' });
-    res.status(200).send(result);
-  } catch (error) {
-    logError('Error deleting mentor:', error);
-    res.status(500).json({ message: 'Failed to delete mentor' });
-  }
-});
+// Keep related data when removing access, including for older DELETE clients.
+router.patch('/:id/access', authenticateAdmin, changeAccess('mentors'));
+router.delete('/:id', authenticateAdmin, changeAccess('mentors', true));
 
 // GET total mentors - PUBLIC (for dashboard)
 router.get("/total-mentors", authenticateAdmin, async (req, res) => {

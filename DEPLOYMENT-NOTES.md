@@ -24,6 +24,13 @@ and mentor recovery uses administrator-issued, 15-minute, single-use links;
 administrators must verify identities and deliver links securely. Do not put
 passwords or reset links in source control, logs, or chat.
 
+Administrators can deactivate and reactivate student and mentor accounts. These
+actions revoke current sessions and reset links but retain the account, help
+requests, assignments and uploaded materials. Existing mentor materials remain
+available to assigned students. Account DELETE API aliases now deactivate;
+they do not permanently erase data. Define a separate reviewed retention and
+erasure process before handling real personal data.
+
 The database module exports an asynchronous function. The identified active
 route calls have been adjusted to await a connection; database failure paths
 still need broader testing.

@@ -17,7 +17,6 @@ export default function ManageMentors() {
 
   const [mentors, setMentors] = useState([]);
   const [updateFormData, setUpdateFormData] = useState({});
-  const [deleteId, setDeleteId] = useState("");
   const [errors, setErrors] = useState([]);
   const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -236,31 +235,24 @@ export default function ManageMentors() {
     loadMentorsForUpdate();
   };
 
-  // DELETE MENTOR
-  const handleDeleteSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!deleteId) {
-      showMessage("Please enter a mentor ID to delete.", "error");
-      return;
-    }
-
+  // Keep mentor accounts and their materials when access is removed.
+  const setMentorAccess = async (mentor, active) => {
+    const id = mentor._id || mentor.id;
     try {
-      await axios.delete(`/api/onboardmentors/${deleteId}`, {
+      await axios.patch(`/api/onboardmentors/${id}/access`, { active }, {
         headers: {
           'Authorization': `Bearer ${tokenManager.getToken()}`,
           'Content-Type': 'application/json'
         }
       });
-      showMessage(`✅ Mentor ${deleteId} deleted successfully`);
-      setDeleteId("");
-      loadMentors();
+      showMessage(`Mentor ${active ? 'activated' : 'deactivated'} successfully`);
+      setMentors(prev => prev.map(item => (item._id || item.id) === id ? { ...item, isActive: active, accessAllowed: active ? 'granted' : 'denied' } : item));
     } catch (error) {
-      console.error('Error deleting mentor:', error);
+      console.error('Error updating mentor access:', error);
       if (error.response?.status === 404) {
         showMessage("Mentor not found.", "error");
       } else {
-        showMessage("Error deleting mentor.", "error");
+        showMessage("Error updating mentor access.", "error");
       }
     }
   };
@@ -272,6 +264,7 @@ export default function ManageMentors() {
     setSuccessMessage("");
     if (tab === "read") loadMentors();
     if (tab === "update") loadMentorsForUpdate();
+    if (tab === "delete") loadMentors();
   };
 
   // Filter mentors for search
@@ -294,7 +287,7 @@ export default function ManageMentors() {
         <div className="manage-mentors-header">
           <div className="header-icon">👨‍🏫</div>
           <h1 className="manage-mentors-title">Manage Mentors</h1>
-          <p className="manage-mentors-subtitle">Create, view, update, and delete mentor records</p>
+          <p className="manage-mentors-subtitle">Create, view, update and manage mentor access</p>
         </div>
 
         {/* SUCCESS MESSAGE */}
@@ -341,7 +334,7 @@ export default function ManageMentors() {
               className={`tab-mentors ${activeTab === "delete" ? "active" : ""}`}
               onClick={() => handleTabChange("delete")}
             >
-              Delete Mentor
+              Manage Access
             </button>
           </div>
 
@@ -509,6 +502,7 @@ export default function ManageMentors() {
                             <th>Last Name</th>
                             <th>Cell Number</th>
                             <th>Username</th>
+                            <th>Access</th>
                             <th>Account recovery</th>
                           </tr>
                         </thead>
@@ -520,7 +514,8 @@ export default function ManageMentors() {
                               <td>{mentor.surname}</td>
                               <td>{mentor.cellnumber}</td>
                               <td>{mentor.username}</td>
-                              <td><button type="button" onClick={() => createResetLink(mentor._id || mentor.id)} aria-label={`Reset password for ${mentor.username}`}>Create reset link</button></td>
+                              <td>{mentor.isActive === false || mentor.accessAllowed === 'denied' ? 'Inactive' : 'Active'}</td>
+                              <td><button type="button" disabled={mentor.isActive === false || mentor.accessAllowed === 'denied'} onClick={() => createResetLink(mentor._id || mentor.id)} aria-label={`Reset password for ${mentor.username}`}>Create reset link</button></td>
                             </tr>
                           ))}
                         </tbody>
@@ -640,43 +635,19 @@ export default function ManageMentors() {
             {activeTab === "delete" && (
               <div className="tab-pane-mentors active">
                 <div className="form-section">
-                  <h3 className="section-title">Delete Mentor</h3>
-                  <p className="section-subtitle">Permanently remove a mentor from the system</p>
-                  
-                  <form onSubmit={handleDeleteSubmit} className="mentors-form">
-                    <div className="form-row">
-                      <div className="form-group full-width">
-                        <label className="form-label">Mentor ID to Delete *</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={deleteId}
-                          onChange={(e) => setDeleteId(e.target.value)}
-                          placeholder="Enter Mentor ID"
-                          required
-                        />
-                        <div className="input-hint">
-                          Enter the exact ID of the mentor you want to delete
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="action-section">
-                      <button 
-                        type="submit" 
-                        disabled={!deleteId}
-                        className="delete-button"
-                      >
-                        🗑️ Delete Mentor
-                      </button>
-
-                      <div className="form-requirements">
-                        <span className="requirement-text warning">
-                          ⚠️ This action cannot be undone
-                        </span>
-                      </div>
-                    </div>
-                  </form>
+                  <h3 className="section-title">Manage Mentor Access</h3>
+                  <p className="section-subtitle">Deactivation stops sign-in and retains related records. Access can be restored.</p>
+                  {loadingRead ? <p>Loading mentors...</p> : <table className="data-table">
+                    <thead><tr><th>Name</th><th>Username</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>{filteredMentors.map(mentor => {
+                      const inactive = mentor.isActive === false || mentor.accessAllowed === 'denied';
+                      return <tr key={mentor._id || mentor.id}>
+                        <td>{mentor.name} {mentor.surname}</td><td>{mentor.username}</td>
+                        <td>{inactive ? 'Inactive' : 'Active'}</td>
+                        <td><button type="button" onClick={() => setMentorAccess(mentor, inactive)}>{inactive ? 'Activate' : 'Deactivate'}</button></td>
+                      </tr>;
+                    })}</tbody>
+                  </table>}
                 </div>
               </div>
             )}

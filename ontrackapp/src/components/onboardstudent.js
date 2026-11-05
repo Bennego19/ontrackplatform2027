@@ -280,29 +280,29 @@ export default function ManageStudents() {
     loadStudentsForUpdate();
   };
 
-  // DELETE STUDENT
-  // When the user clicks "Delete" for a student, we send a DELETE request to the API with the student's ID
-  const deleteStudent = async (id, studentName) => {
+  // Access changes keep the account and its related records.
+  const setStudentAccess = async (student, active) => {
+    const id = student._id || student.id;
     try {
-      const response = await fetch(`/api/onboardstudents/${id}`, {
-        method: "DELETE",
+      const response = await fetch(`/api/onboardstudents/${id}/access`, {
+        method: "PATCH",
         headers: {
           'Authorization': `Bearer ${tokenManager.getToken()}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ active })
       });
 
       if (response.ok) {
-        showMessage(`✅ Student "${studentName}" deleted successfully`);
-        // Optimistic update: remove student from local state immediately
-        setStudents(prev => prev.filter(student => student._id !== id && student.id !== id));
+        showMessage(`Student ${active ? 'activated' : 'deactivated'} successfully`);
+        setStudents(prev => prev.map(item => (item._id || item.id) === id ? { ...item, isActive: active, accessAllowed: active ? 'granted' : 'denied' } : item));
       } else if (response.status === 404) {
         showMessage("Student not found.", "error");
       } else {
-        showMessage("Error deleting student.", "error");
+        showMessage("Error updating student access.", "error");
       }
     } catch (error) {
-      showMessage("Network error deleting student.", "error");
+      showMessage("Network error updating student access.", "error");
     }
   };
 
@@ -337,7 +337,7 @@ export default function ManageStudents() {
         <div className="manage-students-header">
           <div className="header-icon">👨‍🎓</div>
           <h1 className="manage-students-title">Manage Students</h1>
-          <p className="manage-students-subtitle">Create, view, update, and delete student records</p>
+          <p className="manage-students-subtitle">Create, view, update and manage student access</p>
         </div>
 
         {/* SUCCESS MESSAGE */}
@@ -384,7 +384,7 @@ export default function ManageStudents() {
               className={`tab-students ${activeTab === "delete" ? "active" : ""}`}
               onClick={() => handleTabChange("delete")}
             >
-              Delete Student
+              Manage Access
             </button>
           </div>
 
@@ -605,8 +605,8 @@ export default function ManageStudents() {
                             <td>{student.program || 'N/A'}</td>
                             <td>{student.track || 'N/A'}</td>
                             <td>{student.username || 'N/A'}</td>
-                            <td><button type="button" onClick={() => createResetLink(student._id || student.id)} aria-label={`Reset password for ${student.username}`}>Create reset link</button></td>
-                            <td>{student.accessAllowed || 'N/A'}</td>
+                            <td><button type="button" disabled={student.isActive === false || student.accessAllowed !== 'granted'} onClick={() => createResetLink(student._id || student.id)} aria-label={`Reset password for ${student.username}`}>Create reset link</button></td>
+                            <td>{student.isActive !== false && student.accessAllowed === 'granted' ? 'Active' : 'Inactive'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -750,8 +750,8 @@ export default function ManageStudents() {
               <div className="tab-pane-students active">
                 <div className="form-section">
                   <div className="section-header">
-                    <h3 className="section-title">Delete Students</h3>
-                    <p className="section-subtitle">Select a student to permanently remove from the system</p>
+                    <h3 className="section-title">Manage Student Access</h3>
+                    <p className="section-subtitle">Deactivation stops sign-in and retains related records. Access can be restored.</p>
                     <div className="search-refresh-container">
                       <input
                         type="text"
@@ -792,10 +792,10 @@ export default function ManageStudents() {
                             <td>{student.username}</td>
                             <td>
                               <button
-                                onClick={() => deleteStudent(student._id || student.id, `${student.name} ${student.surname}`)}
+                                onClick={() => setStudentAccess(student, student.isActive === false || student.accessAllowed !== 'granted')}
                                 className="delete-btn"
                               >
-                                🗑️ Delete
+                                {student.isActive === false || student.accessAllowed !== 'granted' ? 'Activate' : 'Deactivate'}
                               </button>
                             </td>
                           </tr>
@@ -804,16 +804,11 @@ export default function ManageStudents() {
                     </table>
                     {filteredStudents.length === 0 && (
                       <div className="no-data-message">
-                        {searchTerm ? "No students found matching your search." : "No students available for deletion."}
+                        {searchTerm ? "No students found matching your search." : "No students available."}
                       </div>
                     )}
                   </div>
 
-                  <div className="form-requirements">
-                    <span className="requirement-text warning">
-                      ⚠️ Deletion is permanent and cannot be undone
-                    </span>
-                  </div>
                 </div>
               </div>
             )}

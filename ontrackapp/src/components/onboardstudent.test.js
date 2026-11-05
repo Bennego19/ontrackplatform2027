@@ -182,7 +182,7 @@ describe('ManageStudents Component - Authentication Headers', () => {
     }
   });
 
-  test('deleteStudent includes Authorization header', async () => {
+  test('student access can be deactivated and restored without removing the row', async () => {
     // Mock students data
     const mockStudents = [{
       _id: '123',
@@ -190,7 +190,8 @@ describe('ManageStudents Component - Authentication Headers', () => {
       surname: 'Doe',
       email: 'john.doe@example.com',
       program: 'Mentorship Program',
-      track: 'Web Development'
+      track: 'Web Development',
+      accessAllowed: 'granted'
     }];
 
     fetch.mockImplementation(() =>
@@ -202,36 +203,20 @@ describe('ManageStudents Component - Authentication Headers', () => {
 
     render(<ManageStudents />);
 
-    // Switch to delete tab
-    fireEvent.click(screen.getByText('Delete Student'));
+    fireEvent.click(screen.getByText('Manage Access'));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith('/api/onboardstudents', expect.any(Object));
     });
 
-    // Mock successful delete response
-    fetch.mockImplementationOnce(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({}),
-      })
-    );
-
-    // Click delete button
-    const deleteButtons = screen.getAllByText('🗑️ Delete');
-    if (deleteButtons.length > 0) {
-      fireEvent.click(deleteButtons[0]);
-
-      await waitFor(() => {
-        expect(fetch).toHaveBeenCalledWith('/api/onboardstudents/123', {
-          method: 'DELETE',
-          headers: {
-            'Authorization': 'Bearer mock-jwt-token',
-            'Content-Type': 'application/json'
-          }
-        });
-      });
-    }
+    fireEvent.click(await screen.findByRole('button', { name: 'Deactivate' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/onboardstudents/123/access', {
+      method: 'PATCH', headers: { 'Authorization': 'Bearer mock-jwt-token', 'Content-Type': 'application/json' }, body: JSON.stringify({ active: false })
+    }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Activate' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/onboardstudents/123/access', {
+      method: 'PATCH', headers: { 'Authorization': 'Bearer mock-jwt-token', 'Content-Type': 'application/json' }, body: JSON.stringify({ active: true })
+    }));
   });
 
   test('handles authentication errors gracefully', async () => {
@@ -256,7 +241,7 @@ describe('ManageStudents Component - Authentication Headers', () => {
       ok: true,
       json: async () => url.includes('/password-reset/')
         ? { token: 'A'.repeat(43) }
-        : [{ _id: '123', name: 'Test', surname: 'Student', username: 'teststudent' }]
+        : [{ _id: '123', name: 'Test', surname: 'Student', username: 'teststudent', accessAllowed: 'granted' }]
     }));
     render(<ManageStudents />);
     fireEvent.click(screen.getByRole('button', { name: 'View Students' }));

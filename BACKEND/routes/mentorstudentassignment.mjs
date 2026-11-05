@@ -91,11 +91,11 @@ router.post("/student", authenticateAdmin, async (req, res) => {
           const sId = new ObjectId(studentId);
 
           const [mentor, student] = await Promise.all([
-            database.collection('mentors').findOne({ _id: mId }, { projection: { _id: 1 } }),
-            database.collection('students').findOne({ _id: sId }, { projection: { _id: 1 } })
+            database.collection('mentors').findOne({ _id: mId, isActive: { $ne: false }, accessAllowed: { $ne: 'denied' } }, { projection: { _id: 1 } }),
+            database.collection('students').findOne({ _id: sId, isActive: { $ne: false }, accessAllowed: 'granted' }, { projection: { _id: 1 } })
           ]);
           if (!mentor || !student) {
-            results.errors.push({ mentorId, studentId, error: 'Mentor or student not found' });
+            results.errors.push({ mentorId, studentId, error: 'Mentor or student is unavailable' });
             continue;
           }
 
@@ -163,7 +163,17 @@ router.get("/active-count", authenticateAdmin, async (req, res) => {
   try {
     const database = await db();
     const collection = database.collection("mentor_assignments");
-    const count = await collection.countDocuments({ status: "active" });
+    const result = await collection.aggregate([
+      { $match: { status: 'active' } },
+      { $lookup: { from: 'mentors', localField: 'mentorId', foreignField: '_id', as: 'mentor' } },
+      { $unwind: '$mentor' },
+      { $match: { 'mentor.isActive': { $ne: false }, 'mentor.accessAllowed': { $ne: 'denied' } } },
+      { $lookup: { from: 'students', localField: 'studentId', foreignField: '_id', as: 'student' } },
+      { $unwind: '$student' },
+      { $match: { 'student.isActive': { $ne: false }, 'student.accessAllowed': 'granted' } },
+      { $count: 'count' }
+    ]).toArray();
+    const count = result[0]?.count || 0;
     res.status(200).json({ count });
   } catch (error) {
     logError("Error fetching active count:", error);
@@ -190,6 +200,7 @@ router.get("/student", authenticateToken, async (req, res) => {
         }
       },
       { $unwind: "$mentor" },
+      { $match: { 'mentor.isActive': { $ne: false }, 'mentor.accessAllowed': { $ne: 'denied' } } },
       {
         $project: {
           "mentor.name": 1,

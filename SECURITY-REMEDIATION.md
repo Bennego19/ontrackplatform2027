@@ -1,6 +1,6 @@
 # Security remediation status
 
-Do not deploy to production yet. The security review is incomplete and these changes are local only.
+Do not deploy to production yet. The security review is incomplete and these changes have not been deployed.
 
 ## Changes made
 
@@ -8,7 +8,8 @@ Do not deploy to production yet. The security review is incomplete and these cha
 - The student list requires an administrator and excludes the password field. Student debug and test routes, the legacy `/api/user` routes, and the legacy general `/api/auth/login` route are disabled pending redesign. Admin management and access-control routes require admin authentication; admin debug and sample-account routes are disabled.
 - Request bodies and passwords are no longer logged by the reviewed login and student-creation paths. Production startup rejects a missing, short, or known fallback JWT secret.
 - Newly issued administrator, student and mentor tokens carry only an account ID, role, token version and standard expiry claims; profile details are read from the account instead.
-- Help requests are restricted to their creator, with separate administrator review and action routes. The shared authentication middleware checks whether accounts remain active. The new help-request ownership field uses the user's ID; the production database is reported to be empty.
+- Help requests are restricted to their creator, with separate administrator review and action routes. Ownership uses both account type and ID; older records without account type require a reviewed migration for creator access. The production database is reported to be empty.
+- Student and mentor accounts can be deactivated and reactivated without deleting related records. Access changes revoke existing sessions and reset links. Existing mentor materials and assignments remain available to assigned students, while inactive accounts are excluded from new assignments and active assignment counts. Legacy account DELETE endpoints now deactivate rather than delete.
 - The frontend help-request management page requires an administrator, and dashboard responses no longer persist in browser storage. The application removes legacy dashboard cache entries at startup; tests cover student redirection, cache removal, and reloading dashboard data.
 - Mentor passwords are hashed; mentor management requires an administrator and lists exclude password hashes.
 - `bootstrap-admin.mjs` provisions one initial administrator using explicit database settings and a password read from standard input. It refuses repeated bootstrap attempts and existing administrator records. Tested against a disposable database; production provisioning remains a separate deployment step.

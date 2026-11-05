@@ -9,7 +9,7 @@ export async function countsByTrack() {
     { $match: { 'mentor.isActive': { $ne: false }, 'mentor.accessAllowed': { $ne: 'denied' } } },
     { $lookup: { from: 'students', localField: 'studentId', foreignField: '_id', as: 'student' } },
     { $unwind: '$student' },
-    { $match: { 'student.track': { $type: 'string', $ne: '' } } },
+    { $match: { 'student.isActive': { $ne: false }, 'student.accessAllowed': 'granted', 'student.track': { $type: 'string', $ne: '' } } },
     { $group: { _id: { track: '$student.track', mentorId: '$mentorId' } } },
     { $group: { _id: '$_id.track', count: { $sum: 1 } } }
   ]).toArray();

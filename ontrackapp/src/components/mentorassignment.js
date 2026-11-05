@@ -55,7 +55,7 @@ export default function AssignMentor() {
       if (!response.ok) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
-      setMentors(data);
+      setMentors(data.filter(mentor => mentor.isActive !== false && mentor.accessAllowed !== 'denied'));
     } catch (error) {
       console.error("Error fetching mentors:", error);
       setMentors([]);
@@ -79,7 +79,7 @@ export default function AssignMentor() {
       if (!response.ok) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
-      setStudents(data);
+      setStudents(data.filter(student => student.isActive !== false && student.accessAllowed === 'granted'));
     } catch (error) {
       console.error("Error fetching students:", error);
       setStudents([]);

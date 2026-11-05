@@ -336,7 +336,7 @@ test('student credentials and privileged routes', async () => {
     const temporaryMentor = await db.collection('mentors').insertOne({ username: 'temporarymentor' });
     assert.equal((await request(`/api/onboardmentors/${temporaryMentor.insertedId}`, { method: 'DELETE', headers: studentHeaders })).status, 403);
     assert.equal((await request(`/api/onboardmentors/${temporaryMentor.insertedId}`, { method: 'DELETE', headers: adminHeaders })).status, 200);
-    assert.equal(await db.collection('mentors').countDocuments({ _id: temporaryMentor.insertedId }), 0);
+    assert.equal((await db.collection('mentors').findOne({ _id: temporaryMentor.insertedId })).isActive, false);
     assert.equal((await request('/api/onboardmentors/onboardmentor', { method: 'POST', headers: studentHeaders, body: JSON.stringify(mentorData) })).status, 403);
     const mentorCreate = await request('/api/onboardmentors/onboardmentor', { method: 'POST', headers: adminHeaders, body: JSON.stringify(mentorData) });
     assert.equal(mentorCreate.status, 201);
@@ -390,7 +390,7 @@ test('student credentials and privileged routes', async () => {
     const simultaneousLinks = await Promise.all([1, 2].map(() => request('/api/mentorstudentassignment/student', { method: 'POST', headers: adminHeaders, body: JSON.stringify({ mentorIds: [mentorRecord._id], studentIds: [student._id] }) })));
     assert.deepEqual(simultaneousLinks.map(result => result.body.results.successful.length).sort(), [0, 1]);
     assert.equal(simultaneousLinks.reduce((total, result) => total + result.body.results.alreadyAssigned.length, 0), 1);
-    const extraStudent = await db.collection('students').insertOne({ username: 'metricstudent', track: 'Test' });
+    const extraStudent = await db.collection('students').insertOne({ username: 'metricstudent', track: 'Test', accessAllowed: 'granted' });
     await db.collection('mentor_assignments').insertOne({ mentorId: mentorRecord._id, studentId: extraStudent.insertedId, status: 'active' });
     assert.equal((await request('/api/onboardmentors/mentors-by-track', { headers: adminHeaders })).body.mentorsByTrack.Test, 2);
     await db.collection('mentor_assignments').deleteOne({ mentorId: mentorRecord._id, studentId: extraStudent.insertedId });

@@ -8,6 +8,7 @@ import { studentLoginLimit } from '../middleware/authRateLimit.mjs';
 import bcrypt from "bcrypt";
 import { exactCaseInsensitive } from '../utils/exactMatch.mjs';
 import { contentVisibility } from '../utils/contentVisibility.mjs';
+import { changeAccess } from '../controllers/accountAccess.mjs';
 
 const router = express.Router();
 
@@ -206,11 +207,19 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
     // Literal expressions prevent field values beginning with $ being evaluated.
     const updates = Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, { $literal: value }]));
     if (fields.accessAllowed !== undefined) {
-      updates.tokenVersion = { $cond: [
+      const active = fields.accessAllowed === 'granted';
+      const changed = { $or: [
         { $ne: ['$accessAllowed', { $literal: fields.accessAllowed }] },
+        { $ne: [{ $ifNull: ['$isActive', true] }, active] }
+      ] };
+      updates.isActive = { $literal: active };
+      updates.tokenVersion = { $cond: [
+        changed,
         { $add: [{ $ifNull: ['$tokenVersion', 0] }, 1] },
         { $ifNull: ['$tokenVersion', 0] }
       ] };
+      updates.passwordResetHash = { $cond: [changed, '$$REMOVE', '$passwordResetHash'] };
+      updates.passwordResetExpiresAt = { $cond: [changed, '$$REMOVE', '$passwordResetExpiresAt'] };
     }
     const result = await collection.updateOne(query, [{ $set: updates }]);
     if (!result.matchedCount) return res.status(404).json({ message: 'Student not found' });
@@ -222,18 +231,10 @@ router.patch("/:id", authenticateAdmin, async (req, res) => {
   }
 });
 
-// DELETE student
-router.delete("/:id", authenticateAdmin, async (req, res) => {
-  try {
-    const collection = await getCollection("students");
-    const query = { _id: new ObjectId(req.params.id) };
-    const result = await collection.deleteOne(query);
-    res.status(200).json(result);
-  } catch (error) {
-    logError("Delete student error:", error);
-    res.status(500).json({ error: "Failed to delete student" });
-  }
-});
+// Retain account-related records when access is removed. The DELETE alias is
+// kept for older clients but also deactivates rather than deleting data.
+router.patch('/:id/access', authenticateAdmin, changeAccess('students'));
+router.delete('/:id', authenticateAdmin, changeAccess('students', true));
 
 // ==================== AUTHENTICATION ====================
 

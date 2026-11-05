@@ -9,7 +9,8 @@ export async function issue(accountType, accountId) {
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   const collection = (await db()).collection(accountType);
-  const result = await collection.updateOne({ _id: new ObjectId(accountId) }, { $set: { passwordResetHash: digest(token), passwordResetExpiresAt: expiresAt } });
+  const active = accountType === 'students' ? { accessAllowed: 'granted' } : { accessAllowed: { $ne: 'denied' } };
+  const result = await collection.updateOne({ _id: new ObjectId(accountId), isActive: { $ne: false }, ...active }, { $set: { passwordResetHash: digest(token), passwordResetExpiresAt: expiresAt } });
   return result.matchedCount ? { token, expiresAt } : null;
 }
 
