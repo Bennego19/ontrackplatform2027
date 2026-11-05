@@ -113,6 +113,7 @@ const mockResources = [
     createdAt: '2024-01-05',
     program: 'Skills Development Program',
     track: 'Web Development',
+    websiteLink: 'https://example.test/guide',
     documentLink: '/documents/resource1.pdf'
   }
 ];
@@ -255,6 +256,16 @@ describe('UserDashboard Component - Thorough Testing', () => {
       expect(screen.getByText('Learning Resources')).toBeInTheDocument();
       expect(screen.getByText('Resources (1)')).toBeInTheDocument();
       expect(screen.getByText('CSS Guide')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('CSS Guide'));
+      expect(screen.getByRole('link', { name: 'Open website' })).toHaveAttribute('href', 'https://example.test/guide');
+    });
+
+    test('does not render unsafe resource links', async () => {
+      authAPI.getUserResources.mockResolvedValue([{ ...mockResources[0], websiteLink: 'javascript:alert(1)' }]);
+      render(<UserDashboard />);
+      await waitFor(() => fireEvent.click(screen.getByText('Resources')));
+      fireEvent.click(await screen.findByText('CSS Guide'));
+      expect(screen.queryByRole('link', { name: 'Open website' })).not.toBeInTheDocument();
     });
 
     test('renders assignments tab with assignment list', async () => {

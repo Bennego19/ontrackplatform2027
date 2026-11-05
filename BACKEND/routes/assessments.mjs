@@ -223,6 +223,7 @@ router.get("/resources", authenticateToken, async (req, res) => {
     const results = await req.db.collection("assessments")
       .find(userTypeQuery("resource", req.dbUser))
       .toArray();
+    const managedResources = await req.db.collection('resources').find(visibility(req.dbUser)).toArray();
     let mentorResources = [];
     if (req.userType === 'students' && ObjectId.isValid(req.dbUser._id)) {
       const assignments = await req.db.collection('mentor_assignments').find({ studentId: new ObjectId(req.dbUser._id), status: 'active' }).toArray();
@@ -231,6 +232,11 @@ router.get("/resources", authenticateToken, async (req, res) => {
     }
     res.json([
       ...results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })),
+      ...managedResources.map(item => ({
+        _id: item._id, assessmentname: item.name, description: item.description,
+        program: item.program, track: item.track, websiteLink: item.websiteLink,
+        createdAt: item.createdAt, documentLink: item.document?.relativePath || null
+      })),
       ...mentorResources.map(item => ({ _id: item._id, assessmentname: item.title, description: item.description, createdAt: item.createdAt, documentLink: item.document?.relativePath || null }))
     ]);
   } catch (error) {

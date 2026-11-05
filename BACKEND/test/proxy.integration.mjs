@@ -61,7 +61,7 @@ test('frontend proxy reaches login and preserves programme and track access', as
       assert.equal(created.status, 201);
     }
     const resourceForm = new FormData();
-    for (const [key, value] of Object.entries({ name: 'Scoped resource', description: 'Local test', program: 'Mentorship Program', track: 'Web Development' })) resourceForm.append(key, value);
+    for (const [key, value] of Object.entries({ name: 'Scoped resource', description: 'Local test', program: 'Mentorship Program', track: 'Web Development', websiteLink: 'https://example.test/guide' })) resourceForm.append(key, value);
     resourceForm.append('document', new Blob(['local proxy document']), 'guide.txt');
     const resourceResponse = await fetch(`${base}/api/resources`, { method: 'POST', headers: { Authorization: `Bearer ${admin.body.token}` }, body: resourceForm });
     assert.equal(resourceResponse.status, 201);
@@ -78,6 +78,15 @@ test('frontend proxy reaches login and preserves programme and track access', as
     assert.equal(firstResources.body.some(item => item._id === resource._id), true);
     assert.equal(secondResources.body.some(item => item._id === resource._id), false);
     assert.equal(thirdResources.body.some(item => item._id === resource._id), false);
+    const firstDashboardResources = await call('/api/assessments/resources', 'GET', null, first.body.token);
+    const secondDashboardResources = await call('/api/assessments/resources', 'GET', null, second.body.token);
+    const thirdDashboardResources = await call('/api/assessments/resources', 'GET', null, third.body.token);
+    const dashboardResource = firstDashboardResources.body.find(item => item._id === resource._id);
+    assert.equal(dashboardResource.assessmentname, 'Scoped resource');
+    assert.equal(dashboardResource.websiteLink, 'https://example.test/guide');
+    assert.equal(dashboardResource.documentLink, resource.document.relativePath);
+    assert.equal(secondDashboardResources.body.some(item => item._id === resource._id), false);
+    assert.equal(thirdDashboardResources.body.some(item => item._id === resource._id), false);
     const download = token => fetch(base + resource.document.relativePath, { headers: { Authorization: `Bearer ${token}` } });
     assert.equal(await (await download(first.body.token)).text(), 'local proxy document');
     assert.equal((await download(second.body.token)).status, 404);

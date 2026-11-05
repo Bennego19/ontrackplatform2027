@@ -4,6 +4,12 @@ import axios from 'axios';
 import { authAPI, tokenManager } from "../services/authMiddleware";
 import DocumentViewer from './DocumentViewer';
 
+function safeWebsiteLink(value) {
+  if (typeof value !== 'string') return null;
+  try { return ['http:', 'https:'].includes(new URL(value).protocol) ? value : null; }
+  catch { return null; }
+}
+
 const UserDashboard = () => {
   // State management
 
@@ -1168,6 +1174,7 @@ const renderModules = () => {
 };
 const renderResources = () => {
   const resourceList = resources;
+  const websiteLink = safeWebsiteLink(selectedResource?.websiteLink);
 
   return (
     <div>
@@ -1207,6 +1214,7 @@ const renderResources = () => {
                       <button onClick={() => openDocumentModal(selectedResource.documentLink)} style={{ display: 'inline-block', padding: '12px 24px', backgroundColor: '#4299e1', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>View Document</button>
                     </div>
                   )}
+                  {websiteLink && <p><a href={websiteLink} target="_blank" rel="noopener noreferrer">Open website</a></p>}
                 </div>
 
                 <div style={{ flex: '1', marginBottom: '30px' }}>
