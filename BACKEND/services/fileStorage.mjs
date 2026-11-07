@@ -8,7 +8,7 @@ const allowed = new Set(['.pdf', '.doc', '.docx', '.txt', '.png', '.jpg', '.jpeg
 
 const parser = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024, fieldSize: 64 * 1024, fields: 32, files: 1, parts: 34 },
   fileFilter: (req, file, callback) => {
     const extension = path.extname(file.originalname).toLowerCase();
     callback(allowed.has(extension) ? null : new Error('Unsupported file type'), allowed.has(extension));
@@ -18,7 +18,11 @@ const parser = multer({
 export function parseDocument(req, res, next) {
   parser(req, res, error => {
     if (!error) return next();
-    return res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'File exceeds 10 MB' : 'Unsupported or invalid file' });
+    if (error.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'File exceeds 10 MB' });
+    if (['LIMIT_FIELD_VALUE', 'LIMIT_FIELD_COUNT', 'LIMIT_FILE_COUNT', 'LIMIT_PART_COUNT'].includes(error.code)) {
+      return res.status(413).json({ error: 'Upload form exceeds allowed limits' });
+    }
+    return res.status(400).json({ error: 'Unsupported or invalid file' });
   });
 }
 
