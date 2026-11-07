@@ -4,6 +4,7 @@ services:
     name: ontrack-2027-preview
     runtime: node
     plan: free
+    region: frankfurt
     rootDir: BACKEND
     buildCommand: npm ci --omit=dev
     startCommand: npm start
