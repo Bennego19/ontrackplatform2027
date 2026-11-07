@@ -174,8 +174,23 @@ router.get("/tasks", authenticateToken, async (req, res) => {
       name: task.assessmentname || null,
       description: task.description || null
     }));
-
-    res.json(tasksWithLinks);
+    let mentorTasks = [];
+    if (req.userType === 'students' && ObjectId.isValid(req.dbUser._id)) {
+      const studentId = req.dbUser._id.toString();
+      const links = await req.db.collection('mentor_assignments').find({
+        studentId: new ObjectId(studentId), status: 'active'
+      }, { projection: { mentorId: 1 } }).toArray();
+      const mentorIds = links.map(link => link.mentorId.toString());
+      mentorTasks = await req.db.collection('mentor_tasks').find({
+        mentorId: { $in: mentorIds },
+        $or: [{ assignedTo: studentId }, { assignedTo: '' }, { assignedTo: null }]
+      }, { projection: { title: 1, description: 1, dueDate: 1, createdAt: 1 } }).toArray();
+    }
+    res.json([...tasksWithLinks, ...mentorTasks.map(task => ({
+      _id: task._id, assessmentname: task.title, name: task.title,
+      description: task.description || null, datedue: task.dueDate || null,
+      createdAt: task.createdAt, documentLink: null
+    }))]);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch tasks" });
   }
