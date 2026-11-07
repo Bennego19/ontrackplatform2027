@@ -42,8 +42,8 @@ to `npm start`. Set `NODE_VERSION=22`, `NODE_ENV=production`, `ATLAS_URI`, `DB_N
 with its owner before connecting. A 200 from `/api/health` does not verify the
 database connection.
 
-For an isolated temporary preview, `BACKEND/render.yaml` is a prepared Render
-Blueprint, not an existing deployment. When using it, select that custom file
+For the isolated temporary preview, `BACKEND/render.yaml` defines the Render
+Blueprint. When using it, select that custom file
 path; it sets the service root to `BACKEND`, uses a free preview service, and
 prompts for `DB_NAME` and `ATLAS_URI` on initial Blueprint creation. Supply a
 dedicated **non-production** database and credentials; Render generates a JWT
@@ -52,10 +52,11 @@ values in preview environments, so provision those separately where needed.
 The free service is for preview, not the production plan. Review service names,
 costs, networking, and the exact target database before creating anything.
 
-After the backend is secured, deployed, and verified, copy
-`ontrackapp/vercel.json.example` to `ontrackapp/vercel.json` and replace the
-placeholder host with the actual 2027 Render service URL. The file assumes
-the Vercel project root is `ontrackapp`; adapt it to the real project settings.
+The preview branch's `ontrackapp/vercel.json` routes `/api/*` to the separate
+`ontrack-2027-preview` Render service. It is for disposable test data only:
+replace the preview host with the verified production backend before using this
+file for production or merging it into a production deployment branch. The file
+assumes the Vercel project root is `ontrackapp`; adapt it to the real settings.
 The final rewrite serves the React app for client-side routes. Review any
 existing Vercel rewrites before replacing them. Validate the API, uploads, and
 client-side routes on a preview deployment before switching production.
