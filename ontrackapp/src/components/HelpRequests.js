@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css'; // Reuse dashboard styles
+import './HelpRequests.css';
 import AdminLogin from './adminlogin';
 import { useDashboardApi } from '../hooks/useApi';
 import { tokenManager } from '../services/authMiddleware';
@@ -194,10 +195,10 @@ const HelpRequests = () => {
                       <strong>By:</strong> {request.createdBy.name} ({request.createdBy.email})
                     </p>
                     <p className="availability">
-                      <strong>Availability:</strong> {request.availability}
+                      <strong>Availability:</strong> {request.availability || 'Not specified'}
                     </p>
                     <p className="contact">
-                      <strong>Contact:</strong> {request.contactPreference}
+                      <strong>Contact:</strong> {request.contactPreference || 'Not specified'}
                     </p>
                     <p className="helpful-count">
                       <strong>Helpful:</strong> {request.helpfulCount} times

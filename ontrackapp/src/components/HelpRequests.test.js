@@ -40,3 +40,20 @@ test('an administrator loads help requests and refreshes them every minute', asy
     intervals.mockRestore();
   }
 });
+
+test('an administrator sees unspecified contact preferences honestly', async () => {
+  authAPI.verifyToken.mockResolvedValue({ success: true, user: { role: 'admin' } });
+  useDashboardApi.mockImplementation(() => ({
+    data: [{ id: 'test', topic: 'Test request', status: 'open', area: 'Technical', description: 'Test',
+      createdBy: { name: 'Preview student', email: 'preview@example.test' }, availability: null,
+      contactPreference: null, helpfulCount: 0, createdAt: '2026-11-07' }],
+    loading: false, error: null, refetch: mocks.refresh,
+  }));
+  try {
+    render(<MemoryRouter><HelpRequests /></MemoryRouter>);
+    await screen.findByText('Test request');
+    expect(screen.getAllByText('Not specified')).toHaveLength(2);
+  } finally {
+    useDashboardApi.mockImplementation(() => ({ data: [], loading: false, error: null, refetch: mocks.refresh }));
+  }
+});

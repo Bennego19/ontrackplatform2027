@@ -1,0 +1,39 @@
+.help-requests-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+}
+
+.help-request-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: .75rem;
+  padding: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.help-request-card .request-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .75rem;
+}
+
+.help-request-card .request-header h4 { font-size: 1.125rem; font-weight: 700; }
+.help-request-card .status-badge { border-radius: 999px; background: #e0e7ff; color: #3730a3; padding: .2rem .65rem; }
+.help-request-card .request-details p { margin: .4rem 0; }
+.help-request-card .request-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1rem; }
+.help-request-card .request-actions button {
+  min-height: 2.75rem;
+  padding: .55rem .9rem;
+  border: 1px solid #4338ca;
+  border-radius: .5rem;
+  color: white;
+  background: #4338ca;
+  font-weight: 600;
+  cursor: pointer;
+}
+.help-request-card .request-actions .reject-btn { color: #991b1b; background: white; border-color: #b91c1c; }
+.help-request-card .request-actions button:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
