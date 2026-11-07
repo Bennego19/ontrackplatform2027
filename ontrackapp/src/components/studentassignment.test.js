@@ -12,7 +12,7 @@ test('assigns a student only after programme and track are selected', async () =
   const { container } = render(<StudentAssignment />);
   await screen.findByRole('option', { name: 'Test Student' });
   expect(screen.queryByRole('option', { name: 'Inactive Student' })).not.toBeInTheDocument();
-  expect(axios.get).toHaveBeenCalledWith('/api/onboardstudents/', { headers: { Authorization: 'Bearer admin-token' } });
+  expect(axios.get).toHaveBeenCalledWith('/api/onboardstudents', { headers: { Authorization: 'Bearer admin-token' } });
   const [student, programme, track] = container.querySelectorAll('select');
   const button = screen.getByRole('button', { name: 'Assign Student' });
   fireEvent.change(student, { target: { value: 'student-1' } });

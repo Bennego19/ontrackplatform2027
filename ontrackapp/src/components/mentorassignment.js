@@ -45,7 +45,7 @@ export default function AssignMentor() {
     try {
       setLoadingMentors(true);
       console.log("Fetching mentors...");
-      const response = await fetch("/api/onboardmentors/", {
+      const response = await fetch("/api/onboardmentors", {
         headers: {
           Authorization: `Bearer ${tokenManager.getToken()}`,
           "Content-Type": "application/json"
@@ -69,7 +69,7 @@ export default function AssignMentor() {
     try {
       setLoadingStudents(true);
       console.log("Fetching students...");
-      const response = await fetch("/api/onboardstudents/", {
+      const response = await fetch("/api/onboardstudents", {
         headers: {
           Authorization: `Bearer ${tokenManager.getToken()}`,
           "Content-Type": "application/json"

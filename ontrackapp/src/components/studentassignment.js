@@ -44,7 +44,7 @@ export default function StudentAssignment() {
 
   const fetchStudents = async () => {
     try {
-      const res = await axios.get("/api/onboardstudents/", { headers: { Authorization: `Bearer ${tokenManager.getToken()}` } });
+      const res = await axios.get("/api/onboardstudents", { headers: { Authorization: `Bearer ${tokenManager.getToken()}` } });
       setStudents(res.data.filter(student => student.isActive !== false && student.accessAllowed === 'granted'));
     } catch (error) {
       console.error("Error fetching students:", error);
