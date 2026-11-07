@@ -60,6 +60,21 @@ test('student credentials and privileged routes', async () => {
     assert.equal(login.status, 200);
     assert.deepEqual(Object.keys(jwt.decode(login.body.token)).sort(), ['exp', 'iat', 'id', 'role', 'tokenVersion']);
     const adminHeaders = { authorization: `Bearer ${login.body.token}` };
+    // Cohort management must return promptly for invalid IDs and preserve the
+    // existing response shapes while using the database-backed service.
+    assert.equal((await request('/api/cohorts/not-an-id', { method: 'PATCH', headers: adminHeaders, body: '{}' })).status, 400);
+    assert.equal((await request('/api/cohorts/not-an-id', { method: 'DELETE', headers: adminHeaders })).status, 400);
+    const cohort = { cohortname: 'Preview cohort', cohorttrack: 'Web Development', cohortnumber: '1', programname: 'Mentorship Program', startdate: '2026-11-07' };
+    const cohortCreated = await request('/api/cohorts/createcohort', { method: 'POST', headers: adminHeaders, body: JSON.stringify(cohort) });
+    assert.equal(cohortCreated.status, 200);
+    assert.ok(cohortCreated.body.insertedId);
+    assert.equal((await request('/api/cohorts/total', { headers: adminHeaders })).body.total, 1);
+    assert.equal((await request('/api/cohorts', { headers: adminHeaders })).body[0].cohortname, cohort.cohortname);
+    const cohortId = cohortCreated.body.insertedId;
+    const cohortUpdated = await request(`/api/cohorts/${cohortId}`, { method: 'PATCH', headers: adminHeaders, body: JSON.stringify({ ...cohort, cohortname: 'Updated cohort' }) });
+    assert.equal(cohortUpdated.body.matchedCount, 1);
+    assert.equal((await request('/api/cohorts', { headers: adminHeaders })).body[0].cohortname, 'Updated cohort');
+    assert.equal((await request(`/api/cohorts/${cohortId}`, { method: 'DELETE', headers: adminHeaders })).body.deletedCount, 1);
     const adminId = new ObjectId(login.body.user.id);
     await db.collection('admins').updateOne({ _id: adminId }, { $set: { role: 'superadmin' } });
     assert.equal((await request('/api/auth/verify', { method: 'POST', headers: adminHeaders, body: '{}' })).status, 403);
@@ -302,6 +317,8 @@ test('student credentials and privileged routes', async () => {
     assert.equal((await request('/api/help-requests', { method: 'POST', headers: studentHeaders, body: '{}' })).status, 400);
     assert.equal((await request('/api/help-requests/not-an-id', { headers: studentHeaders })).status, 400);
     const help = await request('/api/help-requests', { method: 'POST', headers: studentHeaders, body: JSON.stringify({ topic: 'Need help', area: 'Course', description: 'Question' }) });
+    assert.equal(help.body.helpRequest.availability, null);
+    assert.equal(help.body.helpRequest.contactPreference, null);
     assert.equal(help.status, 201, JSON.stringify(help.body));
     await db.collection('mentors').insertOne({ _id: student._id, username: 'collisionmentor', isActive: true });
     const collisionMentorToken = jwt.sign({ id: student._id.toString(), role: 'mentor' }, env.JWT_SECRET, { expiresIn: '1h' });
@@ -329,6 +346,13 @@ test('student credentials and privileged routes', async () => {
     assert.equal((await request(`/api/help-requests/${help.body.id}`, { method: 'PUT', headers: studentHeaders, body: JSON.stringify({ status: 'resolved' }) })).status, 200);
     assert.equal((await request(`/api/help-requests/${help.body.id}`, { method: 'DELETE', headers: studentHeaders })).status, 200);
     assert.equal((await request(`/api/help-requests/${help.body.id}`, { headers: studentHeaders })).status, 404);
+    const specifiedHelp = await request('/api/help-requests', { method: 'POST', headers: studentHeaders, body: JSON.stringify({
+      topic: 'Another question', area: 'Course', description: 'Question', availability: ' Evenings ', contactPreference: ' Phone '
+    }) });
+    assert.equal(specifiedHelp.status, 201);
+    assert.equal(specifiedHelp.body.helpRequest.availability, 'Evenings');
+    assert.equal(specifiedHelp.body.helpRequest.contactPreference, 'Phone');
+    assert.equal((await request(`/api/help-requests/${specifiedHelp.body.id}`, { method: 'DELETE', headers: studentHeaders })).status, 200);
     const mentorData = { name: 'Test', surname: 'Mentor', email: 'mentor@example.test', cellnumber: '0123456789', username: 'testmentor', password: 'mentor-test-password' };
     assert.equal((await request('/api/onboardmentors')).status, 401);
     assert.equal((await request('/api/onboardmentors/not-an-id', { method: 'DELETE', headers: adminHeaders })).status, 400);

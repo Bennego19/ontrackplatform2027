@@ -19,7 +19,7 @@ export async function create(input, user, accountType) {
   const now = new Date();
   const doc = {
     topic: input.topic.trim(), area: input.area.trim(), description: input.description.trim(),
-    availability: input.availability || 'Flexible', contactPreference: input.contactPreference || 'Email',
+    availability: input.availability?.trim() || null, contactPreference: input.contactPreference?.trim() || null,
     status: 'open', helpfulCount: 0,
     createdBy: { id: user._id.toString(), accountType, username: user.username, name: user.name || user.username, email: user.email },
     createdAt: now, updatedAt: now
