@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { tokenManager } from "../services/authMiddleware";
 import DocumentDownloadButton from './DocumentDownloadButton';
 import "./OnboardStudent.css";
@@ -13,6 +13,7 @@ export default function ManageResources() {
     track: ""
   });
   const [file, setFile] = useState(null);
+  const createFileInput = useRef(null);
 
   const [resources, setResources] = useState([]);
   const [programs, setPrograms] = useState([]);
@@ -146,6 +147,7 @@ export default function ManageResources() {
         track: ""
       });
       setFile(null);
+      if (createFileInput.current) createFileInput.current.value = "";
 
       // Refresh resources list
       loadResources();
@@ -413,6 +415,7 @@ export default function ManageResources() {
                           <label className="form-label">Or Upload a Document</label>
                            <input
                             type="file"
+                            ref={createFileInput}
                             className={`form-input ${getFieldError("file") ? "error" : ""}`}
                             onChange={(e) => handleInputChange("file", e.target.files[0])}
                             disabled={loading}

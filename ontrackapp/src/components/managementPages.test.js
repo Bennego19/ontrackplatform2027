@@ -6,6 +6,8 @@ import ManageGraduate from './managegraduate';
 import ManageInternship from './manageinternship';
 import ManageMentorship from './managementorship';
 import ManageSkillDevelopment from './manageskilldevelopment';
+import ManageResources from './manageresources';
+import userEvent from '@testing-library/user-event';
 
 vi.mock('axios', () => ({ default: { get: vi.fn(), post: vi.fn(), patch: vi.fn() } }));
 vi.mock('../services/authMiddleware', () => ({ tokenManager: { getToken: () => 'test-token' } }));
@@ -74,4 +76,33 @@ test('event list, creation and update send the administrator token', async () =>
   fireEvent.change(await screen.findByDisplayValue('Existing event'), { target: { value: 'Changed event' } });
   fireEvent.click(screen.getByRole('button', { name: /Save/i }));
   await waitFor(() => expect(fetchMock.mock.calls.some(([url, options]) => url === '/api/events/event-123' && options?.method === 'PATCH' && options.headers.Authorization === 'Bearer test-token')).toBe(true));
+});
+
+test('a successful resource upload clears the file input so the same file can be selected again', async () => {
+  const fetchMock = vi.fn(async (url, options = {}) => ({
+    ok: true,
+    json: async () => options.method === 'POST' ? {} :
+      url === '/api/programs' ? [{ _id: 'p', name: 'Mentorship Program' }] :
+      url === '/api/tracks' ? [{ _id: 't', name: 'C# Programming' }] : []
+  }));
+  vi.stubGlobal('fetch', fetchMock);
+  const user = userEvent.setup();
+  const { container } = render(<ManageResources />);
+  await screen.findByRole('option', { name: 'Mentorship Program' });
+  await screen.findByRole('option', { name: 'C# Programming' });
+  await user.type(screen.getByPlaceholderText('Enter resource name'), 'Test document');
+  await user.type(screen.getByPlaceholderText('Enter resource description'), 'Preview only');
+  const fileInput = container.querySelector('input[type="file"]');
+  const document = new File(['preview test'], 'test.txt', { type: 'text/plain' });
+  await user.upload(fileInput, document);
+  const selects = container.querySelectorAll('select');
+  await user.selectOptions(selects[0], 'Mentorship Program');
+  await user.selectOptions(selects[1], 'C# Programming');
+  await user.click(container.querySelector('button[type="submit"]'));
+  await screen.findByText(/created successfully/i);
+  const request = fetchMock.mock.calls.find(([url, options]) => url === '/api/resources' && options?.method === 'POST');
+  expect(request[1].body.get('document')).toBe(document);
+  expect(fileInput.files).toHaveLength(0);
+  await user.upload(fileInput, document);
+  expect(fileInput.files[0]).toBe(document);
 });
