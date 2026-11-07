@@ -468,6 +468,25 @@ describe('UserDashboard Component - Thorough Testing', () => {
   });
 
   describe('Navigation and Tab Switching', () => {
+    test('distinguishes tasks that share a title', async () => {
+      authAPI.getUserTasks.mockResolvedValue([
+        { _id: 'task-a', assessmentname: 'Shared title', description: 'First task details' },
+        { _id: 'task-b', assessmentname: 'Shared title', description: 'Second task details' }
+      ]);
+      render(<UserDashboard />);
+      await screen.findByText('Welcome back, John!');
+      fireEvent.click(screen.getByText('Tasks'));
+      const titles = await screen.findAllByText('Shared title');
+      fireEvent.click(titles[0]);
+      expect(screen.getByText('First task details')).toBeInTheDocument();
+      expect(titles[0].parentElement).toHaveStyle({ backgroundColor: '#ebf8ff' });
+      expect(titles[1].parentElement).toHaveStyle({ backgroundColor: '#ffffff' });
+      fireEvent.click(titles[1]);
+      expect(screen.getByText('Second task details')).toBeInTheDocument();
+      expect(titles[0].parentElement).toHaveStyle({ backgroundColor: '#ffffff' });
+      expect(titles[1].parentElement).toHaveStyle({ backgroundColor: '#ebf8ff' });
+    });
+
     test('switches between tabs correctly', async () => {
       render(<UserDashboard />);
 

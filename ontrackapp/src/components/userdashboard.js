@@ -1899,31 +1899,31 @@ const renderTasks = () => {
               flexDirection: 'column',
               gap: '10px'
             }}>
-              {sortedTasks.map((task, index) => (
+              {sortedTasks.map((task) => (
                 <div
-                  key={index}
+                  key={task._id}
                   onClick={() => setSelectedTask(task)}
                   style={{
                     padding: '16px',
                     borderRadius: '8px',
                     border: '1px solid #e2e8f0',
-                    backgroundColor: selectedTask?.assessmentname === task.assessmentname 
+                    backgroundColor: selectedTask?._id === task._id 
                       ? '#ebf8ff' 
                       : '#ffffff',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    borderLeft: selectedTask?.assessmentname === task.assessmentname 
+                    borderLeft: selectedTask?._id === task._id 
                       ? '4px solid #4299e1' 
                       : '1px solid #e2e8f0'
                   }}
                   onMouseEnter={(e) => {
-                    if (selectedTask?.assessmentname !== task.assessmentname) {
+                    if (selectedTask?._id !== task._id) {
                       e.currentTarget.style.backgroundColor = '#f7fafc';
                       e.currentTarget.style.borderColor = '#cbd5e0';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (selectedTask?.assessmentname !== task.assessmentname) {
+                    if (selectedTask?._id !== task._id) {
                       e.currentTarget.style.backgroundColor = '#ffffff';
                       e.currentTarget.style.borderColor = '#e2e8f0';
                     }
@@ -1932,7 +1932,7 @@ const renderTasks = () => {
                   <div style={{
                     fontSize: '16px',
                     fontWeight: '600',
-                    color: selectedTask?.assessmentname === task.assessmentname
+                    color: selectedTask?._id === task._id
                       ? '#2b6cb0'
                       : '#1a202c',
                     marginBottom: '6px'
