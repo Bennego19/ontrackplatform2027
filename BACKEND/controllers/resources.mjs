@@ -15,8 +15,13 @@ export async function list(req, res) {
 
 export async function create(req, res) {
   if (!validWebsiteLink(req.body?.websiteLink)) return res.status(400).json({ error: 'Invalid website link' });
+  const { name, description, program, track, websiteLink } = req.body || {};
+  if (![name, description].every(value => typeof value === 'string' && value.trim()) ||
+      [program, track].some(value => value !== undefined && typeof value !== 'string') ||
+      (!websiteLink && !req.file)) {
+    return res.status(400).json({ error: 'A name, description and website or document are required; programme and track must be text' });
+  }
   try {
-    const { name, description, program, track, websiteLink } = req.body || {};
     const result = await service.create({ name, description, program, track, websiteLink: websiteLink || null }, req.file);
     res.status(201).json(result);
   } catch { res.status(500).json({ error: 'Failed to create resource' }); }

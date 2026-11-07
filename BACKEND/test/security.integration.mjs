@@ -235,6 +235,21 @@ test('student credentials and privileged routes', async () => {
     assert.equal((await request(`/api/assessments/${assessment.id}`, { method: 'DELETE', headers: adminHeaders })).status, 200);
     assert.equal((await request(updatedAssessment.documentLink, { headers: studentHeaders })).status, 404);
     assert.equal(await db.collection('uploads.files').countDocuments(), 0);
+    const resourceRecord = { name: 'Local resource', description: 'Details', program: 'Test', track: 'Test', websiteLink: 'https://example.test/' };
+    for (const badResource of [
+      { ...resourceRecord, name: '   ' },
+      { ...resourceRecord, description: {} },
+      { ...resourceRecord, program: { $ne: '' } },
+      { ...resourceRecord, track: ['Test'] },
+      { ...resourceRecord, websiteLink: '' },
+    ]) {
+      assert.equal((await request('/api/resources', { method: 'POST', headers: adminHeaders, body: JSON.stringify(badResource) })).status, 400);
+    }
+    assert.equal(await db.collection('resources').countDocuments(), 0);
+    const linkResource = await request('/api/resources', { method: 'POST', headers: adminHeaders, body: JSON.stringify(resourceRecord) });
+    assert.equal(linkResource.status, 201);
+    assert.equal(linkResource.body.websiteLink, resourceRecord.websiteLink);
+    assert.equal((await request(`/api/resources/${linkResource.body._id}`, { method: 'DELETE', headers: adminHeaders })).status, 200);
     const resourceForm = new FormData();
     for (const [key, value] of Object.entries({ name: 'Resource', description: 'Local resource', program: 'Test', track: 'Test' })) resourceForm.append(key, value);
     resourceForm.append('document', new Blob(['resource content']), 'resource.txt');
