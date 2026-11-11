@@ -462,9 +462,8 @@
   
   .tab-mentors.active {
     border-bottom: 3px solid #4f46e5;
-    border-right: none;
   }
-  
+
   .tab-content-mentors {
     padding: 20px;
   }
@@ -501,4 +500,50 @@
   .data-table {
     min-width: 800px;
   }
+}
+
+.manage-mentors-container {
+  background: #f3f4f6;
+  color: #000000;
+  font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+}
+
+.manage-mentors-container * {
+  font-family: inherit;
+}
+
+.manage-mentors-header {
+  background: #000000;
+  border-bottom: 4px solid #57090b;
+}
+
+.manage-mentors-title {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.manage-mentors-container .tab-mentors.active {
+  color: #57090b;
+  border-bottom-color: #57090b;
+}
+
+.manage-mentors-container .search-input:focus,
+.manage-mentors-container .form-input:focus,
+.manage-mentors-container .form-select:focus,
+.manage-mentors-container .update-input:focus,
+.manage-mentors-container .update-select:focus {
+  border-color: #57090b;
+  box-shadow: 0 0 0 3px rgba(87, 9, 11, 0.1);
+}
+
+.manage-mentors-container .submit-button,
+.manage-mentors-container .refresh-button,
+.manage-mentors-container .update-btn {
+  background: #57090b;
+}
+
+.manage-mentors-container .submit-button:hover:not(:disabled),
+.manage-mentors-container .refresh-button:hover,
+.manage-mentors-container .update-btn:hover {
+  background: #3b0607;
+  box-shadow: 0 4px 12px rgba(87, 9, 11, 0.25);
 }

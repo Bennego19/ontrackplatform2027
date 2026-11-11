@@ -464,9 +464,8 @@
   
   .tab-students.active {
     border-bottom: 3px solid #4f46e5;
-    border-right: none;
   }
-  
+
   .tab-content-students {
     padding: 20px;
   }
@@ -503,4 +502,50 @@
   .data-table {
     min-width: 1000px;
   }
+}
+
+.manage-students-container {
+  background: #f3f4f6;
+  color: #000000;
+  font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+}
+
+.manage-students-container * {
+  font-family: inherit;
+}
+
+.manage-students-header {
+  background: #000000;
+  border-bottom: 4px solid #57090b;
+}
+
+.manage-students-title {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.manage-students-container .tab-students.active {
+  color: #57090b;
+  border-bottom-color: #57090b;
+}
+
+.manage-students-container .search-input:focus,
+.manage-students-container .form-input:focus,
+.manage-students-container .form-select:focus,
+.manage-students-container .update-input:focus,
+.manage-students-container .update-select:focus {
+  border-color: #57090b;
+  box-shadow: 0 0 0 3px rgba(87, 9, 11, 0.1);
+}
+
+.manage-students-container .submit-button,
+.manage-students-container .refresh-button,
+.manage-students-container .update-btn {
+  background: #57090b;
+}
+
+.manage-students-container .submit-button:hover:not(:disabled),
+.manage-students-container .refresh-button:hover,
+.manage-students-container .update-btn:hover {
+  background: #3b0607;
+  box-shadow: 0 4px 12px rgba(87, 9, 11, 0.25);
 }

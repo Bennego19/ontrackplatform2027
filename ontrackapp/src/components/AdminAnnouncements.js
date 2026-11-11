@@ -107,7 +107,7 @@ export default function AdminAnnouncements() {
   };
 
   return (
-    <div className="manage-mentorship-container">
+    <div className="manage-mentorship-container announcements-page">
       <div className="manage-mentorship-card">
         <div className="manage-mentorship-header">
           <div className="header-icon">📢</div>

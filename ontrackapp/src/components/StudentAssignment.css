@@ -1,17 +1,23 @@
 /* StudentAssignment.css */
 .assignment-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f3f4f6;
   padding: 2rem 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+}
+
+.assignment-container * {
+  font-family: inherit;
 }
 
 .assignment-card {
   background: white;
-  border-radius: 20px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.1);
   padding: 2.5rem;
   width: 100%;
   max-width: 900px;
@@ -20,23 +26,23 @@
 }
 
 .assignment-header {
+  margin: -2.5rem -2.5rem 2.5rem;
+  padding: 2rem 2.5rem;
+  background: #000000;
+  border-bottom: 4px solid #57090b;
   text-align: center;
-  margin-bottom: 2.5rem;
 }
 
 .assignment-title {
-  color: #2d3748;
+  color: #ffffff;
+  font-family: Georgia, 'Times New Roman', serif !important;
   font-size: 2.25rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 .assignment-subtitle {
-  color: #718096;
+  color: rgba(255, 255, 255, 0.72);
   font-size: 1.1rem;
   margin: 0;
 }
@@ -81,8 +87,8 @@
 
 .form-select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #57090b;
+  box-shadow: 0 0 0 3px rgba(87, 9, 11, 0.1);
 }
 
 .form-select:disabled {
@@ -97,7 +103,7 @@
 }
 
 .assign-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #57090b;
   color: white;
   border: none;
   padding: 1rem 2.5rem;
@@ -109,12 +115,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(87, 9, 11, 0.22);
 }
 
 .assign-button:hover:not(.disabled):not(.loading) {
+  background: #3b0607;
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 25px rgba(87, 9, 11, 0.3);
 }
 
 .assign-button.disabled {
@@ -204,7 +211,7 @@
   width: 3rem;
   height: 3rem;
   border: 4px solid #e2e8f0;
-  border-top: 4px solid #667eea;
+  border-top: 4px solid #57090b;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 1rem;
@@ -219,6 +226,11 @@
   .assignment-card {
     padding: 1.5rem;
     border-radius: 16px;
+  }
+
+  .assignment-header {
+    margin: -1.5rem -1.5rem 2.5rem;
+    padding: 1.5rem;
   }
   
   .assignment-title {
@@ -243,6 +255,11 @@
 @media (max-width: 480px) {
   .assignment-card {
     padding: 1rem;
+  }
+
+  .assignment-header {
+    margin: -1rem -1rem 2rem;
+    padding: 1.25rem 1rem;
   }
   
   .assignment-title {

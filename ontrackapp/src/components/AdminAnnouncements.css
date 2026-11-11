@@ -1,23 +1,304 @@
-.announcements-root{display:flex;justify-content:center;padding:24px}
-.announcements-card{width:100%;max-width:980px;background:linear-gradient(180deg,#071226,#041022);border-radius:12px;box-shadow:0 10px 40px rgba(2,6,23,0.6);padding:20px;border:1px solid rgba(255,255,255,0.04);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;color:#e6f0ff}
-.announcements-header{display:flex;flex-direction:column;margin-bottom:12px}
-.announcements-header h2{margin:0;font-size:20px;color:#e6f0ff}
-.announcements-sub{font-size:13px;color:#9fb6d6}
-.announcements-editor{display:flex;flex-direction:column;gap:8px;margin-top:12px}
-.ann-input{padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.03);outline:none;font-size:14px;color:#e6f0ff}
-.ann-textarea{padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.03);outline:none;font-size:14px;min-height:120px;color:#e6f0ff}
-.ann-actions{display:flex;gap:8px;margin-top:6px}
-.btn-primary{background:linear-gradient(90deg,#2b6cb0,#6ad1ff);color:#04293a;padding:10px 16px;border:none;border-radius:8px;cursor:pointer;box-shadow:0 6px 18px rgba(43,92,160,0.18)}
-.btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:10px 14px;border-radius:8px;cursor:pointer;color:#cfe8ff}
-.ann-list{margin-top:18px}
-.ann-loading{color:#9fb6d6}
-.ann-items{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
-.ann-item{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 6px 20px rgba(2,6,23,0.45)}
-.ann-item-main{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.ann-item-title{font-weight:600;color:#e6f0ff}
-.ann-item-date{font-size:12px;color:#9fb6d6}
-.ann-item-body{margin-top:8px;color:#cbd5e1}
-.ann-item-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-.btn-link{background:transparent;border:none;color:#90cdf4;cursor:pointer}
-.btn-danger{background:linear-gradient(90deg,#ff7b7b,#ff5252);border:none;color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer}
-@media (max-width:720px){.announcements-card{padding:12px}.ann-item{padding:10px}}
+.announcements-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: #f3f4f6;
+  color: #000000;
+  font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+}
+
+.announcements-page * {
+  font-family: inherit;
+}
+
+.announcements-page .manage-mentorship-card {
+  width: 100%;
+  max-width: 1400px;
+  margin: 20px 0;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.announcements-page .manage-mentorship-header {
+  padding: 30px 40px;
+  border-bottom: 4px solid #57090b;
+  background: #000000;
+  color: #ffffff;
+  text-align: center;
+}
+
+.announcements-page .header-icon {
+  margin-bottom: 10px;
+  font-size: 3rem;
+}
+
+.announcements-page .manage-mentorship-title {
+  margin: 0 0 8px;
+  color: #ffffff;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+}
+
+.announcements-page .manage-mentorship-subtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 1.1rem;
+  font-weight: 400;
+}
+
+.announcements-page .tabs-mentorship {
+  display: flex;
+  padding: 0 40px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.announcements-page .tab-mentorship {
+  flex: 1;
+  padding: 16px 24px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: #64748b;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.announcements-page .tab-mentorship:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.announcements-page .tab-mentorship.active {
+  border-bottom-color: #57090b;
+  background: #ffffff;
+  color: #57090b;
+}
+
+.announcements-page .tab-content-mentorship {
+  padding: 40px;
+}
+
+.announcements-page .section-title {
+  margin: 0 0 8px;
+  color: #1f2937;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.announcements-page .form-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.announcements-page .form-group {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.announcements-page .form-label {
+  margin-bottom: 6px;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.announcements-page .form-input,
+.announcements-page .update-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.announcements-page .form-input:focus,
+.announcements-page .update-input:focus {
+  outline: none;
+  border-color: #57090b;
+  box-shadow: 0 0 0 3px rgba(87, 9, 11, 0.1);
+}
+
+.announcements-page .action-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.announcements-page .submit-button,
+.announcements-page .refresh-button,
+.announcements-page .update-btn,
+.announcements-page .delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 6px;
+  background: #57090b;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.announcements-page .submit-button {
+  padding: 12px 32px;
+  font-size: 1rem;
+}
+
+.announcements-page .submit-button:hover:not(:disabled),
+.announcements-page .refresh-button:hover,
+.announcements-page .update-btn:hover {
+  background: #3b0607;
+  box-shadow: 0 4px 12px rgba(87, 9, 11, 0.25);
+  transform: translateY(-1px);
+}
+
+.announcements-page .delete-btn {
+  background: #b4232c;
+}
+
+.announcements-page .delete-btn:hover {
+  background: #8f151d;
+}
+
+.announcements-page .cancel-btn {
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 6px;
+  background: #6b7280;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.announcements-page .table-container {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.announcements-page .data-table {
+  width: 100%;
+  min-width: 800px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.announcements-page .data-table th {
+  padding: 16px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color: #374151;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.announcements-page .data-table td {
+  padding: 16px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #4b5563;
+}
+
+.announcements-page .data-table tr:hover {
+  background: #f8fafc;
+}
+
+.announcements-page .no-data-message {
+  padding: 40px;
+  background: #f9fafb;
+  color: #6b7280;
+  text-align: center;
+  font-style: italic;
+}
+
+.announcements-page .success-message,
+.announcements-page .error-message {
+  margin: 20px 40px;
+}
+
+.announcements-page [role="status"] {
+  margin: 20px 40px;
+  color: #4a5568;
+}
+
+@media (max-width: 768px) {
+  .announcements-page {
+    padding: 10px;
+  }
+
+  .announcements-page .manage-mentorship-card {
+    margin: 10px 0;
+  }
+
+  .announcements-page .manage-mentorship-header {
+    padding: 20px;
+  }
+
+  .announcements-page .manage-mentorship-title {
+    font-size: 1.8rem;
+  }
+
+  .announcements-page .tabs-mentorship {
+    flex-direction: column;
+    padding: 0;
+  }
+
+  .announcements-page .tab-mentorship {
+    padding: 12px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+  }
+
+  .announcements-page .tab-mentorship.active {
+    border-bottom: 3px solid #57090b;
+  }
+
+  .announcements-page .tab-content-mentorship {
+    padding: 20px;
+  }
+
+  .announcements-page .form-row,
+  .announcements-page .action-section {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .announcements-page .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .announcements-page .success-message,
+  .announcements-page .error-message,
+  .announcements-page [role="status"] {
+    margin-right: 20px;
+    margin-left: 20px;
+  }
+}

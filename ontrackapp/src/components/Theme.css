@@ -1,0 +1,367 @@
+:root {
+  --ontrack-black: #000000;
+  --ontrack-burgundy: #57090b;
+  --ontrack-burgundy-dark: #3b0607;
+  --ontrack-white: #ffffff;
+  --ontrack-page: #f3f4f6;
+  --ontrack-border: rgba(0, 0, 0, 0.12);
+  --ontrack-text: #1a1a1a;
+  --ontrack-muted: #666666;
+}
+
+body {
+  background: var(--ontrack-page);
+  color: var(--ontrack-text);
+  font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+}
+
+body h1,
+body h2,
+body h3 {
+  color: var(--ontrack-black);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+body a {
+  color: var(--ontrack-burgundy);
+}
+
+body input:focus,
+body select:focus,
+body textarea:focus {
+  border-color: var(--ontrack-burgundy) !important;
+  box-shadow: 0 0 0 3px rgba(87, 9, 11, 0.1) !important;
+  outline: none;
+}
+
+.manage-students-container,
+.manage-mentors-container,
+.manage-mentorship-container,
+.manage-internship-container,
+.manage-skill-development-container,
+.manage-graduate-container,
+.onboard-container,
+.assign-container,
+.assignment-container {
+  background: var(--ontrack-page);
+}
+
+.manage-students-header,
+.manage-mentors-header,
+.manage-mentorship-header,
+.header-section {
+  background: var(--ontrack-black);
+  border-bottom: 4px solid var(--ontrack-burgundy);
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.manage-students-card,
+.manage-mentors-card,
+.manage-mentorship-card,
+.onboard-card,
+.assign-card,
+.assignment-card,
+.form-section,
+.table-section,
+.announcements-card,
+.card,
+.user-info-card {
+  background: var(--ontrack-white);
+  border: 1px solid var(--ontrack-border);
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.manage-students-title,
+.manage-mentors-title,
+.manage-mentorship-title,
+.header-section .page-title {
+  color: var(--ontrack-white);
+}
+
+.manage-students-subtitle,
+.manage-mentors-subtitle,
+.manage-mentorship-subtitle,
+.header-section .page-subtitle {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.tabs-students,
+.tabs-mentors,
+.tabs-mentorship,
+.tab-container .tabs {
+  background: var(--ontrack-page);
+  border-color: var(--ontrack-border);
+}
+
+.tab-students.active,
+.tab-mentors.active,
+.tab-mentorship.active,
+.tab.active {
+  color: var(--ontrack-burgundy);
+  border-bottom-color: var(--ontrack-burgundy);
+}
+
+.tab-students:hover,
+.tab-mentors:hover,
+.tab-mentorship:hover,
+.tab:hover {
+  color: var(--ontrack-burgundy);
+}
+
+.manage-students-container .submit-button,
+.manage-mentors-container .submit-button,
+.manage-mentorship-container .submit-button,
+.manage-students-container .refresh-button,
+.manage-mentors-container .refresh-button,
+.manage-mentorship-container .refresh-button,
+.onboard-container .submit-button,
+.assign-container .submit-button,
+.assignment-container .assign-button,
+.manage-internship-container .create-btn,
+.manage-internship-container .submit-btn,
+.manage-internship-container .update-btn,
+.signup-button,
+.login-button,
+.btn-primary,
+.mentor-dashboard .nav-tab.active,
+.btn-primary:not(:disabled):hover {
+  background: var(--ontrack-burgundy);
+  border-color: var(--ontrack-burgundy);
+  color: var(--ontrack-white);
+}
+
+.manage-students-container .submit-button:hover:not(:disabled),
+.manage-mentors-container .submit-button:hover:not(:disabled),
+.manage-mentorship-container .submit-button:hover:not(:disabled),
+.manage-students-container .refresh-button:hover,
+.manage-mentors-container .refresh-button:hover,
+.manage-mentorship-container .refresh-button:hover,
+.onboard-container .submit-button:hover:not(:disabled),
+.assign-container .submit-button:hover:not(:disabled),
+.assignment-container .assign-button:hover:not(:disabled),
+.manage-internship-container .create-btn:hover,
+.manage-internship-container .submit-btn:hover:not(:disabled),
+.signup-button:hover,
+.login-button:hover,
+.btn-primary:hover:not(:disabled) {
+  background: var(--ontrack-burgundy-dark);
+  border-color: var(--ontrack-burgundy-dark);
+  color: var(--ontrack-white);
+}
+
+.manage-students-container .data-table th,
+.manage-mentors-container .data-table th,
+.manage-mentorship-container .data-table th,
+.manage-internship-container .assessments-table th {
+  background: var(--ontrack-black);
+  color: var(--ontrack-white);
+  border-color: var(--ontrack-burgundy);
+}
+
+.manage-students-container .data-table tr:hover,
+.manage-mentors-container .data-table tr:hover,
+.manage-mentorship-container .data-table tr:hover,
+.manage-internship-container .assessments-table tbody tr:hover {
+  background: rgba(87, 9, 11, 0.04);
+}
+
+.mentor-dashboard {
+  background: var(--ontrack-page);
+}
+
+.mentor-dashboard .dashboard-sidebar {
+  background: var(--ontrack-black);
+  border-color: var(--ontrack-burgundy);
+  color: var(--ontrack-white);
+}
+
+.mentor-dashboard .dashboard-sidebar .welcome-text,
+.mentor-dashboard .dashboard-sidebar .user-info,
+.mentor-dashboard .dashboard-sidebar .user-details,
+.mentor-dashboard .dashboard-sidebar .nav-tab {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.mentor-dashboard .dashboard-sidebar .nav-tab:hover,
+.mentor-dashboard .dashboard-sidebar .nav-tab.active {
+  background: var(--ontrack-burgundy);
+  color: var(--ontrack-white);
+}
+
+.announcements-root {
+  background: var(--ontrack-page);
+}
+
+.announcements-card {
+  color: var(--ontrack-text);
+}
+
+.announcements-header h2,
+.ann-item-title {
+  color: var(--ontrack-black);
+}
+
+.announcements-sub,
+.ann-item-date,
+.ann-loading {
+  color: var(--ontrack-muted);
+}
+
+.ann-input,
+.ann-textarea {
+  background: var(--ontrack-white);
+  border-color: var(--ontrack-border);
+  color: var(--ontrack-text);
+}
+
+.btn-ghost {
+  border-color: var(--ontrack-border);
+  color: var(--ontrack-burgundy);
+}
+
+.btn-link {
+  color: var(--ontrack-burgundy);
+}
+
+.ui-preview {
+  min-height: 100vh;
+  padding: 32px clamp(20px, 5vw, 72px);
+  background: var(--ontrack-page);
+  color: var(--ontrack-text);
+}
+
+.ui-preview-header {
+  margin: -32px calc(clamp(20px, 5vw, 72px) * -1) 32px;
+  padding: 36px clamp(20px, 5vw, 72px);
+  background: var(--ontrack-black);
+  border-bottom: 4px solid var(--ontrack-burgundy);
+  color: var(--ontrack-white);
+}
+
+.ui-preview-header h1 {
+  margin: 0;
+  color: var(--ontrack-white);
+  font-size: clamp(32px, 5vw, 52px);
+}
+
+.ui-preview-header p {
+  margin: 12px 0 0;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.ui-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.ui-preview-card {
+  padding: 22px;
+  border: 1px solid var(--ontrack-border);
+  background: var(--ontrack-white);
+}
+
+.ui-preview-card h2 {
+  margin: 0 0 16px;
+  font-size: 22px;
+}
+
+.ui-preview-kpi {
+  padding: 16px;
+  border-top: 3px solid var(--ontrack-burgundy);
+  background: var(--ontrack-white);
+}
+
+.ui-preview-kpi span {
+  display: block;
+  color: var(--ontrack-muted);
+  font-size: 13px;
+}
+
+.ui-preview-kpi strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--ontrack-black);
+  font-size: 30px;
+}
+
+.ui-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ui-preview-primary,
+.ui-preview-secondary {
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--ontrack-burgundy);
+  border-radius: 2px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ui-preview-primary {
+  background: var(--ontrack-burgundy);
+  color: var(--ontrack-white);
+}
+
+.ui-preview-secondary {
+  background: var(--ontrack-white);
+  color: var(--ontrack-burgundy);
+}
+
+.ui-preview-form label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: 600;
+}
+
+.ui-preview-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--ontrack-border);
+  border-radius: 2px;
+  background: var(--ontrack-white);
+  font: inherit;
+}
+
+.ui-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.ui-preview-table th {
+  padding: 11px 12px;
+  background: var(--ontrack-black);
+  color: var(--ontrack-white);
+}
+
+.ui-preview-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--ontrack-border);
+}
+
+.ui-preview-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+@media (max-width: 600px) {
+  .ui-preview {
+    padding: 20px;
+  }
+
+  .ui-preview-header {
+    margin: -20px -20px 24px;
+    padding: 28px 20px;
+  }
+}

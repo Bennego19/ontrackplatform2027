@@ -515,3 +515,49 @@
 .table-container::-webkit-scrollbar-thumb:hover {
   background: #a1a1a1;
 }
+
+.manage-mentorship-container {
+  background: #f3f4f6;
+  color: #000000;
+  font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+}
+
+.manage-mentorship-container * {
+  font-family: inherit;
+}
+
+.manage-mentorship-header {
+  background: #000000;
+  border-bottom: 4px solid #57090b;
+}
+
+.manage-mentorship-title {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.manage-mentorship-container .tab-mentorship.active {
+  color: #57090b;
+  border-bottom-color: #57090b;
+}
+
+.manage-mentorship-container .search-input:focus,
+.manage-mentorship-container .form-input:focus,
+.manage-mentorship-container .form-select:focus,
+.manage-mentorship-container .update-input:focus,
+.manage-mentorship-container .update-select:focus {
+  border-color: #57090b;
+  box-shadow: 0 0 0 3px rgba(87, 9, 11, 0.1);
+}
+
+.manage-mentorship-container .submit-button,
+.manage-mentorship-container .refresh-button,
+.manage-mentorship-container .update-btn {
+  background: #57090b;
+}
+
+.manage-mentorship-container .submit-button:hover:not(:disabled),
+.manage-mentorship-container .refresh-button:hover,
+.manage-mentorship-container .update-btn:hover {
+  background: #3b0607;
+  box-shadow: 0 4px 12px rgba(87, 9, 11, 0.25);
+}

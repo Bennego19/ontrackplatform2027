@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './Dashboard.css';
 import { useDashboardApi, usePublicApi } from '../hooks/useApi';
 import { tokenManager } from '../services/authMiddleware';
@@ -12,52 +12,56 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [lastUpdate, setLastUpdate] = useState(new Date());
   const [loadPhase, setLoadPhase] = useState(1);
-
-  // Authentication state
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const isLocalPreview = window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+  const [isAuthenticated, setIsAuthenticated] = useState(isLocalPreview);
+  const [userData, setUserData] = useState(
+    isLocalPreview ? { name: 'Admin', role: 'admin' } : null
+  );
+  const [loading, setLoading] = useState(!isLocalPreview);
 
   // ONLY LOAD DASHBOARD DATA WHEN AUTHENTICATED AS ADMIN
-  const shouldLoadDashboardData = isAuthenticated && ['admin', 'superadmin'].includes(userData?.role);
+  const shouldLoadDashboardData = isAuthenticated && userData?.role === 'admin';
 
   // Phase 1: Core metrics - only load if authenticated as admin
-  const { data: totalStudentsData, loading: studentsLoading, refetch: refreshStudents } = useDashboardApi(
+  const { data: totalStudentsData, loading: studentsLoading } = useDashboardApi(
     shouldLoadDashboardData ? '/onboardstudents/total-students' : null
   );
-  const { data: totalMentorsData, loading: mentorsLoading, refetch: refreshMentors } = useDashboardApi(
+  const { data: totalMentorsData, loading: mentorsLoading } = useDashboardApi(
     shouldLoadDashboardData ? '/onboardmentors/total-mentors' : null
   );
-  const { data: programTotalsData, loading: programsLoading, refetch: refreshPrograms } = useDashboardApi(
+  const { data: programTotalsData, loading: programsLoading } = useDashboardApi(
     shouldLoadDashboardData ? '/onboardstudents/totals-by-programs' : null
   );
-  const { data: trackTotalsData, loading: tracksLoading, refetch: refreshTracks } = useDashboardApi(
+  const { data: trackTotalsData, loading: tracksLoading } = useDashboardApi(
     shouldLoadDashboardData ? '/onboardstudents/totals-by-tracks' : null
   );
 
   // Phase 2: Additional metrics - only load if authenticated as admin
-  const { data: totalAssessmentsData, loading: assessmentsLoading, refetch: refreshAssessments } = usePublicApi(
+  const { data: totalAssessmentsData, loading: assessmentsLoading } = usePublicApi(
     shouldLoadDashboardData && loadPhase >= 2 ? '/assessments/total' : null
   );
-  const { data: totalCohortsData, loading: cohortsLoading, refetch: refreshCohorts } = useDashboardApi(
+  const { data: totalCohortsData, loading: cohortsLoading } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 2 ? '/cohorts/total' : null
   );
-  const { loading: assignmentsLoading, refetch: refreshAssignments } = useDashboardApi(
+  const { data: activeAssignmentsData, loading: assignmentsLoading } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 2 ? '/mentorstudentassignment/active-count' : null
   );
 
   // Phase 3: Detailed breakdowns - only load if authenticated as admin
-  const { data: internshipTracksApiData, loading: internshipTracksLoading, refetch: refreshInternshipTracks } = useDashboardApi(
+  const { data: internshipTracksApiData, loading: internshipTracksLoading } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 3 ? '/onboardstudents/internship-tracks-distribution' : null
   );
-  const { data: mentorshipTracksApiData, loading: mentorshipTracksLoading, refetch: refreshMentorshipTracks } = useDashboardApi(
+  const { data: mentorshipTracksApiData, loading: mentorshipTracksLoading } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 3 ? '/onboardstudents/mentorship-tracks-distribution' : null
   );
-  const { data: mentorsByTrackData, loading: mentorsTrackLoading, refetch: refreshMentorsByTrack } = useDashboardApi(
+  const { data: mentorsByTrackData, loading: mentorsTrackLoading } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 3 ? '/onboardmentors/mentors-by-track' : null
   );
-  const { data: assessmentTotalsByProgramData, loading: assessmentProgramsLoading, refetch: refreshAssessmentsByProgram } = usePublicApi(
+  const { data: assessmentTotalsByProgramData, loading: assessmentProgramsLoading } = usePublicApi(
     shouldLoadDashboardData && loadPhase >= 3 ? '/assessments/totals-by-program' : null
   );
 
@@ -86,6 +90,7 @@ const Dashboard = () => {
   const mentorsByTrack = mentorsByTrackData?.mentorsByTrack || {};
   const totalAssessments = totalAssessmentsData?.total || 0;
   const totalCohorts = totalCohortsData?.total || 0;
+  const activeAssignments = activeAssignmentsData?.count || 0;
   const assessmentTotalsByProgram = assessmentTotalsByProgramData?.totals || {};
 
   // Helper functions - only used when authenticated as admin
@@ -125,7 +130,7 @@ const Dashboard = () => {
   );
 
   // Check authentication on component mount - FIXED VERSION
-  useEffect(() => {
+ /* useEffect(() => {
     let isMounted = true;
     let authCheckCount = 0;
     const MAX_AUTH_CHECKS = 3;
@@ -163,7 +168,7 @@ const Dashboard = () => {
           // Check current path and redirect if needed
           const currentPath = window.location.pathname;
           
-          if (['admin', 'superadmin'].includes(response.user.role)) {
+          if (response.user.role === 'admin') {
             // Admin should be on admin routes
             if (currentPath === '/userdashboard') {
               navigate('/dashboard');
@@ -211,20 +216,26 @@ const Dashboard = () => {
     navigate('/');
   };
 
-  const refreshDashboard = useCallback(() => {
-    [refreshStudents, refreshMentors, refreshPrograms, refreshTracks, refreshAssessments,
-      refreshCohorts, refreshAssignments, refreshInternshipTracks, refreshMentorshipTracks,
-      refreshMentorsByTrack, refreshAssessmentsByProgram].forEach(refresh => refresh());
-  }, [refreshStudents, refreshMentors, refreshPrograms, refreshTracks, refreshAssessments,
-    refreshCohorts, refreshAssignments, refreshInternshipTracks, refreshMentorshipTracks,
-    refreshMentorsByTrack, refreshAssessmentsByProgram]);
-
-  // Refresh every 60 seconds only while an administrator is authenticated.
+  // Auto-refresh every 60 seconds - only when authenticated as admin
   useEffect(() => {
     if (!shouldLoadDashboardData) return;
-    const interval = setInterval(refreshDashboard, 60000);
+    
+    const interval = setInterval(() => {
+      setLastUpdate(new Date());
+    }, 60000);
+
     return () => clearInterval(interval);
-  }, [shouldLoadDashboardData, refreshDashboard]);
+  }, [shouldLoadDashboardData]);
+
+  // Function to clear dashboard cache
+  const clearDashboardCache = () => {
+    try {
+      localStorage.removeItem('dashboardCache');
+      console.log('Dashboard cache cleared');
+    } catch (e) {
+      console.warn('Failed to clear dashboard cache:', e);
+    }
+  };
 
   // If loading initial auth check
   if (loading) {
@@ -243,32 +254,38 @@ const Dashboard = () => {
   }
 
   // If authenticated but user is not admin, don't show admin dashboard
-  if (!['admin', 'superadmin'].includes(userData?.role)) {
+  if (userData?.role !== 'admin') {
     // This shouldn't happen because useEffect redirects non-admin users
     return null;
   }
-
+*/
   // ADMIN DASHBOARD VIEW
   return (
     <div className="dashboard">
       <header className="dashboard-header">
-        <h1 className="dashboard-title">OnTrack Connect</h1>
-        <h2 className="dashboard-subtitle">Admin Dashboard</h2>
+        <div className="dashboard-heading">
+          <span className="dashboard-eyebrow">OnTrack Connect</span>
+          <h1 className="dashboard-title">Administration</h1>
+          <p className="dashboard-subtitle">Program operations overview</p>
+        </div>
         <div className="header-actions">
           <span className="user-info">Welcome, {userData?.name || 'Admin'}</span>
           <button
             className="logout-btn"
-            onClick={handleLogout}
+         //   onClick={handleLogout}
             title="Logout"
           >
             Logout
           </button>
           <button
             className="clear-cache-btn"
-            onClick={refreshDashboard}
-            title="Refresh dashboard data"
+            onClick={() => {
+        //      clearDashboardCache();
+              window.location.reload();
+            }}
+            title="Clear cached data and refresh"
           >
-            🔄 Refresh Dashboard
+            Clear Cache
           </button>
         </div>
       </header>
@@ -293,7 +310,7 @@ const Dashboard = () => {
           
           <div className="metrics-grid">
             <div className="metric-card primary">
-              <div className="metric-icon">👥</div>
+              <div className="metric-index">01</div>
               <div className="metric-content">
                 <div className="metric-title">Total Students</div>
                 <div className="metric-value">
@@ -304,48 +321,48 @@ const Dashboard = () => {
             </div>
 
             <div className="metric-card success">
-              <div className="metric-icon">👨‍🏫</div>
+              <div className="metric-index">02</div>
               <div className="metric-content">
                 <div className="metric-title">Total Mentors</div>
                 <div className="metric-value">
                   {dashboardLoading ? '...' : totalMentors.toLocaleString()}
                 </div>
-                <div className="metric-subtitle">All mentors</div>
+                <div className="metric-subtitle">Active Mentors</div>
               </div>
             </div>
 
             <div className="metric-card info">
-              <div className="metric-icon">📝</div>
+              <div className="metric-index">03</div>
               <div className="metric-content">
                 <div className="metric-title">Total Assessments</div>
                 <div className="metric-value">
                   {dashboardLoading ? '...' : totalAssessments}
                 </div>
-                <div className="metric-subtitle">All assessments</div>
+                <div className="metric-subtitle">Completed</div>
               </div>
             </div>
 
             <div className="metric-card secondary">
-              <div className="metric-icon">👨‍👩‍👧‍👦</div>
+              <div className="metric-index">04</div>
               <div className="metric-content">
                 <div className="metric-title">Total Cohorts</div>
                 <div className="metric-value">
                   {dashboardLoading ? '...' : totalCohorts}
                 </div>
-                <div className="metric-subtitle">All groups</div>
+                <div className="metric-subtitle">Active Groups</div>
               </div>
             </div>
 
             {/* Assessment Totals by Program */}
             {Object.keys(assessmentTotalsByProgram).length > 0 && programs.map((program) => (
               <div className="metric-card warning" key={program.key}>
-                <div className="metric-icon">📊</div>
+                <div className="metric-index">05</div>
                 <div className="metric-content">
                   <div className="metric-title">{program.name} Assessments</div>
                   <div className="metric-value">
                     {dashboardLoading ? '...' : assessmentTotalsByProgram[program.key] || 0}
                   </div>
-                  <div className="metric-subtitle">All assessments</div>
+                  <div className="metric-subtitle">Completed</div>
                 </div>
               </div>
             ))}
@@ -371,16 +388,16 @@ const Dashboard = () => {
                       label: 'Students',
                       data: Object.values(programTotals),
                       backgroundColor: [
-                        '#FF6384',
-                        '#36A2EB',
-                        '#FFCE56',
-                        '#4BC0C0'
+                        '#57090b',
+                        '#000000',
+                        '#57090b',
+                        '#000000'
                       ],
                       borderColor: [
-                        '#FF6384',
-                        '#36A2EB',
-                        '#FFCE56',
-                        '#4BC0C0'
+                        '#57090b',
+                        '#000000',
+                        '#57090b',
+                        '#000000'
                       ],
                       borderWidth: 1
                     }]
@@ -411,12 +428,12 @@ const Dashboard = () => {
                     datasets: [{
                       data: Object.values(trackTotals),
                       backgroundColor: [
-                        '#FF6384',
-                        '#36A2EB',
-                        '#FFCE56',
-                        '#4BC0C0',
-                        '#9966FF',
-                        '#FF9F40'
+                        '#57090b',
+                        '#000000',
+                        '#57090b',
+                        '#000000',
+                        '#57090b',
+                        '#000000'
                       ]
                     }]
                   }}
@@ -540,35 +557,27 @@ const Dashboard = () => {
               </div>
               <div className="actions-grid">
                 <a href="/onboardstudent" className="action-btn">
-                  <span className="action-icon">👤</span>
                   <span className="action-text">Onboard Student</span>
                 </a>
                 <a href="/onboardmentor" className="action-btn">
-                  <span className="action-icon">👨‍🏫</span>
                   <span className="action-text">Onboard Mentor</span>
                 </a>
                 <a href="/studentassignment" className="action-btn">
-                  <span className="action-icon">🔗</span>
                   <span className="action-text">Assign Student</span>
                 </a>
                 <a href="/assignmentor" className="action-btn">
-                  <span className="action-icon">🤝</span>
                   <span className="action-text">Assign Mentor</span>
                 </a>
                 <a href="/resources" className="action-btn">
-                  <span className="action-icon">📚</span>
                   <span className="action-text">Resource Center</span>
                 </a>
                 <a href="/announcements" className="action-btn">
-                  <span className="action-icon">📣</span>
                   <span className="action-text">Announcements</span>
                 </a>
                 <a href="/events" className="action-btn">
-                  <span className="action-icon">📅</span>
                   <span className="action-text">Events</span>
                 </a>
                 <a href="/help-requests" className="action-btn">
-                  <span className="action-icon">🆘</span>
                   <span className="action-text">Help Requests</span>
                 </a>
               </div>

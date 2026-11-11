@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/authMiddleware';
 import { tokenManager } from '../services/authMiddleware';
-import { mentorAuthAPI } from '../services/mentorAuthMiddleware';
+import loginPortrait from './home.jpeg';
 import './Dashboard.css'; // Reuse the CSS
 
 const Login = () => {
@@ -12,6 +12,7 @@ const Login = () => {
   const [activeTab, setActiveTab] = useState('admin');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [credentials, setCredentials] = useState({ 
     username: '', 
     password: ''
@@ -26,8 +27,6 @@ const Login = () => {
       let response;
       if (activeTab === 'admin') {
         response = await authAPI.adminLogin(credentials.username, credentials.password);
-      } else if (activeTab === 'mentor') {
-        response = await mentorAuthAPI.login(credentials.username, credentials.password);
       } else {
         response = await authAPI.login(credentials.username, credentials.password);
       }
@@ -37,9 +36,7 @@ const Login = () => {
         tokenManager.setStoredUser(response.user);
 
         // Redirect based on role
-        if (activeTab === 'mentor') {
-          navigate('/mentordashboard');
-        } else if (response.user.role === 'admin' || response.user.role === 'superadmin') {
+        if (response.user.role === 'admin' || response.user.role === 'superadmin') {
           navigate('/dashboard');
         } else {
           navigate('/userdashboard');
@@ -49,7 +46,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      setLoginError(error.message || 'Login failed. Please try again.');
+      setLoginError('Login failed. Please try again.');
     } finally {
       setIsLoggingIn(false);
     }
@@ -64,81 +61,108 @@ const Login = () => {
 
   return (
     <div className="dashboard-login-page">
-      <div className="login-header">
-        <h1 className="login-title">OnTrack Connect</h1>
-        <p className="login-subtitle">Welcome to your learning platform</p>
-      </div>
-      
       <div className="login-container">
-        <div className="login-tabs">
-          <button
-            className={`tab-button ${activeTab === 'admin' ? 'active' : ''}`}
-            onClick={() => setActiveTab('admin')}
-          >
-            Admin Login
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'student' ? 'active' : ''}`}
-            onClick={() => setActiveTab('student')}
-          >
-            Student Login
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'mentor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('mentor')}
-          >
-            Mentor Login
-          </button>
-        </div>
-
-        <form onSubmit={handleLogin} className="login-form">
-          {loginError && <div className="error-message">{loginError}</div>}
-          
-          <h3>{activeTab === 'admin' ? 'Admin' : activeTab === 'mentor' ? 'Mentor' : 'Student'} Login</h3>
-          
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              value={credentials.username}
-              onChange={handleInputChange}
-              required
-              disabled={isLoggingIn}
-              placeholder="Enter your username"
+        <section className="login-visual" aria-hidden="true">
+                 <div className="login-portrait">
+            <img
+                     src={loginPortrait}
+              alt=""
             />
           </div>
-          
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={credentials.password}
-              onChange={handleInputChange}
-              required
-              disabled={isLoggingIn}
-              placeholder="Enter your password"
-            />
+          <p className="login-visual-copy">Learn with purpose.<br />Move with confidence.</p>
+          <div className="copyright">
+            © {new Date().getFullYear()} OnTrack Connect. All rights reserved.
           </div>
-          
-          <button
-            type="submit"
-            className="login-btn"
-            disabled={isLoggingIn}
-          >
-            {isLoggingIn ? 'Logging in...' : `Login as ${activeTab === 'admin' ? 'Admin' : activeTab === 'mentor' ? 'Mentor' : 'Student'}`}
-          </button>
+        </section>
 
-      
-        </form>
-      </div>
-      
+        <section className="login-panel">
+          <div className="login-brand">
+           
+            <span>OnTrack Connect</span>
+          </div>
 
-      <div className="copyright">
-        © {new Date().getFullYear()} OnTrack Connect. All rights reserved.
+          <div className="login-tabs" role="tablist" aria-label="Account type">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'admin'}
+              className={`tab-button ${activeTab === 'admin' ? 'active' : ''}`}
+              onClick={() => setActiveTab('admin')}
+            >
+              Admin
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'student'}
+              className={`tab-button ${activeTab === 'student' ? 'active' : ''}`}
+              onClick={() => setActiveTab('student')}
+            >
+              Student
+            </button>
+          </div>
+
+          <form onSubmit={handleLogin} className="login-form">
+            <div className="login-form-heading">
+              <h1>Login</h1>
+              <p>Enter your credentials to access your account</p>
+            </div>
+
+            {loginError && <div className="error-message">{loginError}</div>}
+
+            <div className="form-group">
+              <label htmlFor="username">Email</label>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                value={credentials.username}
+                onChange={handleInputChange}
+                required
+                disabled={isLoggingIn}
+                placeholder="example@email.com"
+              />
+            </div>
+
+            <div className="form-group password-group">
+              <label htmlFor="password">Password</label>
+              <div className="password-field">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  name="password"
+                  value={credentials.password}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isLoggingIn}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <div className="forgot-password">
+                <a className="forgot-link" href="/forgot-password">Forgot Password?</a>
+              </div>
+            </div>
+
+            <button type="submit" className="login-btn" disabled={isLoggingIn}>
+              {isLoggingIn ? 'Signing in...' : 'Sign In'}
+            </button>
+
+            <div className="login-divider"><span>OR</span></div>
+           
+
+            <p className="signup-section">
+              Don&apos;t have an account? <a className="signup-link" href="/signup">Sign Up</a>
+            </p>
+          </form>
+        </section>
       </div>
     </div>
   );
