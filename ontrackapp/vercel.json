@@ -1,7 +1,7 @@
 {
   "outputDirectory": "build",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://ontrack-2027-preview.onrender.com/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://ontrack-2027-production.onrender.com/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
