@@ -126,6 +126,9 @@ import files from './routes/files.mjs';
 import passwordReset from './routes/passwordReset.mjs';
 import { routePolicy } from './middleware/routePolicy.mjs';
 
+// API responses can include account and student data; prevent intermediary caching.
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+
 // Mount the routes with logging
 app.use('/api', ...makeApiLimiters());
 const routes = [

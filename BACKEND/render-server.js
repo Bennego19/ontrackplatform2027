@@ -91,6 +91,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// API responses can include account and student data; prevent intermediary caching.
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+
 // Mount routes
 app.use('/api', ...makeApiLimiters());
 const routes = [

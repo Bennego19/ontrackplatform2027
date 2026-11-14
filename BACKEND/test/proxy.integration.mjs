@@ -94,7 +94,9 @@ test('frontend proxy reaches login and preserves programme and track access', as
     assert.equal(secondDashboardResources.body.some(item => item._id === resource._id), false);
     assert.equal(thirdDashboardResources.body.some(item => item._id === resource._id), false);
     const download = token => fetch(base + resource.document.relativePath, { headers: { Authorization: `Bearer ${token}` } });
-    assert.equal(await (await download(first.body.token)).text(), 'local proxy document');
+    const firstDownload = await download(first.body.token);
+    assert.match(firstDownload.headers.get('cache-control') || '', /no-store/i);
+    assert.equal(await firstDownload.text(), 'local proxy document');
     assert.equal((await download(second.body.token)).status, 404);
     assert.equal((await download(third.body.token)).status, 404);
   } finally {
