@@ -169,7 +169,7 @@ const Login = () => {
            
 
             <p className="signup-section">
-              Don&apos;t have an account? <a className="signup-link" href="/signup">Sign Up</a>
+              Don&apos;t have an account? <a className="signup-link" href="https://ontrackconnect.co.za/signup.html">Sign Up</a>
             </p>
           </form>
         </section>
