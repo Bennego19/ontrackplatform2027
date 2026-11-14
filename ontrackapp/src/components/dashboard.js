@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 import { useDashboardApi, usePublicApi } from '../hooks/useApi';
 import { tokenManager } from '../services/authMiddleware';
@@ -12,56 +12,52 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [lastUpdate, setLastUpdate] = useState(new Date());
   const [loadPhase, setLoadPhase] = useState(1);
-  const isLocalPreview = window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1';
-  const [isAuthenticated, setIsAuthenticated] = useState(isLocalPreview);
-  const [userData, setUserData] = useState(
-    isLocalPreview ? { name: 'Admin', role: 'admin' } : null
-  );
-  const [loading, setLoading] = useState(!isLocalPreview);
+
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // ONLY LOAD DASHBOARD DATA WHEN AUTHENTICATED AS ADMIN
-  const shouldLoadDashboardData = isAuthenticated && userData?.role === 'admin';
+  const shouldLoadDashboardData = isAuthenticated && ['admin', 'superadmin'].includes(userData?.role);
 
   // Phase 1: Core metrics - only load if authenticated as admin
-  const { data: totalStudentsData, loading: studentsLoading } = useDashboardApi(
+  const { data: totalStudentsData, loading: studentsLoading, refetch: refreshStudents } = useDashboardApi(
     shouldLoadDashboardData ? '/onboardstudents/total-students' : null
   );
-  const { data: totalMentorsData, loading: mentorsLoading } = useDashboardApi(
+  const { data: totalMentorsData, loading: mentorsLoading, refetch: refreshMentors } = useDashboardApi(
     shouldLoadDashboardData ? '/onboardmentors/total-mentors' : null
   );
-  const { data: programTotalsData, loading: programsLoading } = useDashboardApi(
+  const { data: programTotalsData, loading: programsLoading, refetch: refreshPrograms } = useDashboardApi(
     shouldLoadDashboardData ? '/onboardstudents/totals-by-programs' : null
   );
-  const { data: trackTotalsData, loading: tracksLoading } = useDashboardApi(
+  const { data: trackTotalsData, loading: tracksLoading, refetch: refreshTracks } = useDashboardApi(
     shouldLoadDashboardData ? '/onboardstudents/totals-by-tracks' : null
   );
 
   // Phase 2: Additional metrics - only load if authenticated as admin
-  const { data: totalAssessmentsData, loading: assessmentsLoading } = usePublicApi(
+  const { data: totalAssessmentsData, loading: assessmentsLoading, refetch: refreshAssessments } = usePublicApi(
     shouldLoadDashboardData && loadPhase >= 2 ? '/assessments/total' : null
   );
-  const { data: totalCohortsData, loading: cohortsLoading } = useDashboardApi(
+  const { data: totalCohortsData, loading: cohortsLoading, refetch: refreshCohorts } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 2 ? '/cohorts/total' : null
   );
-  const { data: activeAssignmentsData, loading: assignmentsLoading } = useDashboardApi(
+  const { loading: assignmentsLoading, refetch: refreshAssignments } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 2 ? '/mentorstudentassignment/active-count' : null
   );
 
   // Phase 3: Detailed breakdowns - only load if authenticated as admin
-  const { data: internshipTracksApiData, loading: internshipTracksLoading } = useDashboardApi(
+  const { data: internshipTracksApiData, loading: internshipTracksLoading, refetch: refreshInternshipTracks } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 3 ? '/onboardstudents/internship-tracks-distribution' : null
   );
-  const { data: mentorshipTracksApiData, loading: mentorshipTracksLoading } = useDashboardApi(
+  const { data: mentorshipTracksApiData, loading: mentorshipTracksLoading, refetch: refreshMentorshipTracks } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 3 ? '/onboardstudents/mentorship-tracks-distribution' : null
   );
-  const { data: mentorsByTrackData, loading: mentorsTrackLoading } = useDashboardApi(
+  const { data: mentorsByTrackData, loading: mentorsTrackLoading, refetch: refreshMentorsByTrack } = useDashboardApi(
     shouldLoadDashboardData && loadPhase >= 3 ? '/onboardmentors/mentors-by-track' : null
   );
-  const { data: assessmentTotalsByProgramData, loading: assessmentProgramsLoading } = usePublicApi(
+  const { data: assessmentTotalsByProgramData, loading: assessmentProgramsLoading, refetch: refreshAssessmentsByProgram } = usePublicApi(
     shouldLoadDashboardData && loadPhase >= 3 ? '/assessments/totals-by-program' : null
   );
 
@@ -90,7 +86,6 @@ const Dashboard = () => {
   const mentorsByTrack = mentorsByTrackData?.mentorsByTrack || {};
   const totalAssessments = totalAssessmentsData?.total || 0;
   const totalCohorts = totalCohortsData?.total || 0;
-  const activeAssignments = activeAssignmentsData?.count || 0;
   const assessmentTotalsByProgram = assessmentTotalsByProgramData?.totals || {};
 
   // Helper functions - only used when authenticated as admin
@@ -130,7 +125,7 @@ const Dashboard = () => {
   );
 
   // Check authentication on component mount - FIXED VERSION
- /* useEffect(() => {
+  useEffect(() => {
     let isMounted = true;
     let authCheckCount = 0;
     const MAX_AUTH_CHECKS = 3;
@@ -168,7 +163,7 @@ const Dashboard = () => {
           // Check current path and redirect if needed
           const currentPath = window.location.pathname;
           
-          if (response.user.role === 'admin') {
+          if (['admin', 'superadmin'].includes(response.user.role)) {
             // Admin should be on admin routes
             if (currentPath === '/userdashboard') {
               navigate('/dashboard');
@@ -216,26 +211,20 @@ const Dashboard = () => {
     navigate('/');
   };
 
-  // Auto-refresh every 60 seconds - only when authenticated as admin
+  const refreshDashboard = useCallback(() => {
+    [refreshStudents, refreshMentors, refreshPrograms, refreshTracks, refreshAssessments,
+      refreshCohorts, refreshAssignments, refreshInternshipTracks, refreshMentorshipTracks,
+      refreshMentorsByTrack, refreshAssessmentsByProgram].forEach(refresh => refresh());
+  }, [refreshStudents, refreshMentors, refreshPrograms, refreshTracks, refreshAssessments,
+    refreshCohorts, refreshAssignments, refreshInternshipTracks, refreshMentorshipTracks,
+    refreshMentorsByTrack, refreshAssessmentsByProgram]);
+
+  // Refresh every 60 seconds only while an administrator is authenticated.
   useEffect(() => {
     if (!shouldLoadDashboardData) return;
-    
-    const interval = setInterval(() => {
-      setLastUpdate(new Date());
-    }, 60000);
-
+    const interval = setInterval(refreshDashboard, 60000);
     return () => clearInterval(interval);
-  }, [shouldLoadDashboardData]);
-
-  // Function to clear dashboard cache
-  const clearDashboardCache = () => {
-    try {
-      localStorage.removeItem('dashboardCache');
-      console.log('Dashboard cache cleared');
-    } catch (e) {
-      console.warn('Failed to clear dashboard cache:', e);
-    }
-  };
+  }, [shouldLoadDashboardData, refreshDashboard]);
 
   // If loading initial auth check
   if (loading) {
@@ -254,11 +243,10 @@ const Dashboard = () => {
   }
 
   // If authenticated but user is not admin, don't show admin dashboard
-  if (userData?.role !== 'admin') {
+  if (!['admin', 'superadmin'].includes(userData?.role)) {
     // This shouldn't happen because useEffect redirects non-admin users
     return null;
   }
-*/
   // ADMIN DASHBOARD VIEW
   return (
     <div className="dashboard">
@@ -272,20 +260,17 @@ const Dashboard = () => {
           <span className="user-info">Welcome, {userData?.name || 'Admin'}</span>
           <button
             className="logout-btn"
-         //   onClick={handleLogout}
+            onClick={handleLogout}
             title="Logout"
           >
             Logout
           </button>
           <button
             className="clear-cache-btn"
-            onClick={() => {
-        //      clearDashboardCache();
-              window.location.reload();
-            }}
-            title="Clear cached data and refresh"
+            onClick={refreshDashboard}
+            title="Refresh dashboard"
           >
-            Clear Cache
+            Refresh
           </button>
         </div>
       </header>
@@ -327,7 +312,7 @@ const Dashboard = () => {
                 <div className="metric-value">
                   {dashboardLoading ? '...' : totalMentors.toLocaleString()}
                 </div>
-                <div className="metric-subtitle">Active Mentors</div>
+                <div className="metric-subtitle">All mentors</div>
               </div>
             </div>
 
@@ -338,7 +323,7 @@ const Dashboard = () => {
                 <div className="metric-value">
                   {dashboardLoading ? '...' : totalAssessments}
                 </div>
-                <div className="metric-subtitle">Completed</div>
+                <div className="metric-subtitle">All assessments</div>
               </div>
             </div>
 
@@ -349,7 +334,7 @@ const Dashboard = () => {
                 <div className="metric-value">
                   {dashboardLoading ? '...' : totalCohorts}
                 </div>
-                <div className="metric-subtitle">Active Groups</div>
+                <div className="metric-subtitle">All groups</div>
               </div>
             </div>
 
@@ -362,7 +347,7 @@ const Dashboard = () => {
                   <div className="metric-value">
                     {dashboardLoading ? '...' : assessmentTotalsByProgram[program.key] || 0}
                   </div>
-                  <div className="metric-subtitle">Completed</div>
+                  <div className="metric-subtitle">All assessments</div>
                 </div>
               </div>
             ))}

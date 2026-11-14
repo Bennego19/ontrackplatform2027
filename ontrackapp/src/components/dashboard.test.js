@@ -23,9 +23,9 @@ test('a verified superadministrator can see and load the admin dashboard', async
   authAPI.verifyToken.mockResolvedValue({ success: true, user: { role: 'superadmin', name: 'Test Admin' } });
   try {
     render(<MemoryRouter><Dashboard /></MemoryRouter>);
-    expect(await screen.findByText('Admin Dashboard')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Administration' })).toBeInTheDocument();
     expect(useDashboardApi).toHaveBeenCalledWith('/onboardstudents/total-students');
-    fireEvent.click(screen.getByRole('button', { name: /refresh dashboard/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(mocks.refresh).toHaveBeenCalledTimes(11);
     const scheduledRefresh = intervals.mock.calls.find(([, milliseconds]) => milliseconds === 60000);
     expect(scheduledRefresh).toBeDefined();

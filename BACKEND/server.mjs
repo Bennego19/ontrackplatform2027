@@ -21,6 +21,7 @@ import { getDatabase, getConnectionStatus, initializeDatabase, closeDatabase } f
 import { allowedCorsOrigins } from './utils/corsOrigins.mjs';
 import { logError } from './utils/logError.mjs';
 import { authenticateAdmin } from './middleware/auth.js';
+import { makeApiLimiters } from './middleware/apiRateLimit.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,6 +127,7 @@ import passwordReset from './routes/passwordReset.mjs';
 import { routePolicy } from './middleware/routePolicy.mjs';
 
 // Mount the routes with logging
+app.use('/api', ...makeApiLimiters());
 const routes = [
   { path: '/api/onboardstudents', router: onboardstudents, name: 'Onboard Students' },
   { path: '/api/onboardmentors', router: onboardmentors, name: 'Onboard Mentors' },

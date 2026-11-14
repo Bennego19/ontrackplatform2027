@@ -6,6 +6,9 @@ node_modules/
 BACKEND/uploads/*
 BACKEND/.env*
 BACKEND/keys/
+BACKEND/admin-data.json
+BACKEND/APDS7311 Lab Guide 2025.docx
+ontrackapp/ontrackplatform2027/
 
 # Frontend
 ontrackapp/.env*

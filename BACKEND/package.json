@@ -8,7 +8,7 @@
     "start": "node render-server.js",
     "build": "echo \"No build step required\"",
     "dev": "node --watch render-server.js",
-    "test": "node --test test/security.integration.mjs test/accountAccess.integration.mjs test/logging.test.mjs test/auth.test.mjs test/config.test.mjs test/cohorts.failure.test.mjs test/uploadLimits.test.mjs",
+    "test": "node --test test/security.integration.mjs test/accountAccess.integration.mjs test/logging.test.mjs test/auth.test.mjs test/config.test.mjs test/cohorts.failure.test.mjs test/uploadLimits.test.mjs test/apiRateLimit.test.mjs",
     "test:proxy": "node --test test/proxy.integration.mjs"
   },
   "keywords": [

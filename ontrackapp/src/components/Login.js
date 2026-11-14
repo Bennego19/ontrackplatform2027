@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/authMiddleware';
 import { tokenManager } from '../services/authMiddleware';
+import { mentorAuthAPI } from '../services/mentorAuthMiddleware';
 import loginPortrait from './home.jpeg';
 import './Dashboard.css'; // Reuse the CSS
 
@@ -27,6 +28,8 @@ const Login = () => {
       let response;
       if (activeTab === 'admin') {
         response = await authAPI.adminLogin(credentials.username, credentials.password);
+      } else if (activeTab === 'mentor') {
+        response = await mentorAuthAPI.login(credentials.username, credentials.password);
       } else {
         response = await authAPI.login(credentials.username, credentials.password);
       }
@@ -36,7 +39,9 @@ const Login = () => {
         tokenManager.setStoredUser(response.user);
 
         // Redirect based on role
-        if (response.user.role === 'admin' || response.user.role === 'superadmin') {
+        if (activeTab === 'mentor') {
+          navigate('/mentordashboard');
+        } else if (response.user.role === 'admin' || response.user.role === 'superadmin') {
           navigate('/dashboard');
         } else {
           navigate('/userdashboard');
@@ -46,7 +51,7 @@ const Login = () => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      setLoginError('Login failed. Please try again.');
+      setLoginError(error.message || 'Login failed. Please try again.');
     } finally {
       setIsLoggingIn(false);
     }
@@ -100,6 +105,11 @@ const Login = () => {
             >
               Student
             </button>
+            <button type="button" role="tab" aria-selected={activeTab === 'mentor'}
+              className={`tab-button ${activeTab === 'mentor' ? 'active' : ''}`}
+              onClick={() => setActiveTab('mentor')}>
+              Mentor
+            </button>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
@@ -111,7 +121,7 @@ const Login = () => {
             {loginError && <div className="error-message">{loginError}</div>}
 
             <div className="form-group">
-              <label htmlFor="username">Email</label>
+              <label htmlFor="username">Username</label>
               <input
                 type="text"
                 id="username"
@@ -120,7 +130,7 @@ const Login = () => {
                 onChange={handleInputChange}
                 required
                 disabled={isLoggingIn}
-                placeholder="example@email.com"
+                placeholder="Enter your username"
               />
             </div>
 
@@ -147,7 +157,7 @@ const Login = () => {
                 </button>
               </div>
               <div className="forgot-password">
-                <a className="forgot-link" href="/forgot-password">Forgot Password?</a>
+                <a className="forgot-link" href="/reset-password">Forgot Password?</a>
               </div>
             </div>
 

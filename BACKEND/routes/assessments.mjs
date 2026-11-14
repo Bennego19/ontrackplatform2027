@@ -48,6 +48,18 @@ const userTypeQuery = (type, user) => ({
 });
 const assessmentFields = ['assessmentname', 'assessmenttype', 'program', 'track', 'dateadded', 'datedue'];
 
+async function selectedMentorContent(req, collection) {
+    if (req.userType !== 'students' || !ObjectId.isValid(req.dbUser._id)) return [];
+    const studentId = req.dbUser._id.toString();
+    const links = await req.db.collection('mentor_assignments').find(
+        { studentId: new ObjectId(studentId), status: 'active' }, { projection: { mentorId: 1 } }
+    ).toArray();
+    return req.db.collection(collection).find(
+        { mentorId: { $in: links.map(link => link.mentorId.toString()) }, studentIds: studentId },
+        { projection: { title: 1, description: 1, instructions: 1, dueDate: 1, endDate: 1, createdAt: 1 } }
+    ).toArray();
+}
+
 function validAssessmentFields(body, partial = false) {
     if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
     return assessmentFields.every(field => {
@@ -213,7 +225,12 @@ router.get("/assignments", authenticateToken, async (req, res) => {
     const results = await req.db.collection("assessments")
       .find(userTypeQuery("assignment", req.dbUser))
       .toArray();
-    res.json(results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })));
+    const mentorItems = await selectedMentorContent(req, 'mentor_assignment_content');
+    res.json([
+      ...results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })),
+      ...mentorItems.map(item => ({ _id: item._id, assessmentname: item.title, description: item.description || null,
+        instructions: item.instructions || null, datedue: item.dueDate || null, createdAt: item.createdAt, documentLink: null }))
+    ]);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch assignments" });
   }
@@ -224,7 +241,12 @@ router.get("/projects", authenticateToken, async (req, res) => {
     const results = await req.db.collection("assessments")
       .find(userTypeQuery("project", req.dbUser))
       .toArray();
-    res.json(results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })));
+    const mentorItems = await selectedMentorContent(req, 'mentor_projects');
+    res.json([
+      ...results.map(m => ({ ...m, documentLink: m.document?.relativePath || null })),
+      ...mentorItems.map(item => ({ _id: item._id, assessmentname: item.title, description: item.description || null,
+        datedue: item.endDate || null, createdAt: item.createdAt, documentLink: null }))
+    ]);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch projects" });
   }

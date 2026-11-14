@@ -1299,31 +1299,31 @@ const assignmentAssessments = assignments;
               flexDirection: 'column',
               gap: '10px'
             }}>
-              {assignmentAssessments.map((assignment, index) => (
+              {assignmentAssessments.map((assignment) => (
                 <div
-                  key={index}
+                  key={assignment._id}
                   onClick={() => setSelectedAssignment(assignment)}
                   style={{
                     padding: '16px',
                     borderRadius: '8px',
                     border: '1px solid #e2e8f0',
-                    backgroundColor: selectedAssignment?.assessmentname === assignment.assessmentname 
+                    backgroundColor: selectedAssignment?._id === assignment._id
                       ? '#ebf8ff' 
                       : '#ffffff',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    borderLeft: selectedAssignment?.assessmentname === assignment.assessmentname 
+                    borderLeft: selectedAssignment?._id === assignment._id
                       ? '4px solid #4299e1' 
                       : '1px solid #e2e8f0'
                   }}
                   onMouseEnter={(e) => {
-                    if (selectedAssignment?.assessmentname !== assignment.assessmentname) {
+                    if (selectedAssignment?._id !== assignment._id) {
                       e.currentTarget.style.backgroundColor = '#f7fafc';
                       e.currentTarget.style.borderColor = '#cbd5e0';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (selectedAssignment?.assessmentname !== assignment.assessmentname) {
+                    if (selectedAssignment?._id !== assignment._id) {
                       e.currentTarget.style.backgroundColor = '#ffffff';
                       e.currentTarget.style.borderColor = '#e2e8f0';
                     }
@@ -1332,7 +1332,7 @@ const assignmentAssessments = assignments;
                   <div style={{
                     fontSize: '16px',
                     fontWeight: '600',
-                    color: selectedAssignment?.assessmentname === assignment.assessmentname
+                    color: selectedAssignment?._id === assignment._id
                       ? '#2b6cb0'
                       : '#1a202c',
                     marginBottom: '6px'
@@ -1489,6 +1489,7 @@ const assignmentAssessments = assignments;
                       <p>No detailed description available for this assignment.</p>
                     </div>
                   )}
+                  {selectedAssignment.instructions && <div style={{ marginTop: '20px', whiteSpace: 'pre-wrap' }}><strong>Instructions:</strong><p>{selectedAssignment.instructions}</p></div>}
                 </div>
                 
                 {selectedAssignment.documentLink && (
@@ -2137,31 +2138,31 @@ const renderProjects = () => {
               flexDirection: 'column',
               gap: '10px'
             }}>
-              {projectAssessments.map((project, index) => (
+              {projectAssessments.map((project) => (
                 <div
-                  key={index}
+                  key={project._id}
                   onClick={() => setSelectedProject(project)}
                   style={{
                     padding: '16px',
                     borderRadius: '8px',
                     border: '1px solid #e2e8f0',
-                    backgroundColor: selectedProject?.assessmentname === project.assessmentname 
+                    backgroundColor: selectedProject?._id === project._id
                       ? '#ebf8ff' 
                       : '#ffffff',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    borderLeft: selectedProject?.assessmentname === project.assessmentname 
+                    borderLeft: selectedProject?._id === project._id
                       ? '4px solid #4299e1' 
                       : '1px solid #e2e8f0'
                   }}
                   onMouseEnter={(e) => {
-                    if (selectedProject?.assessmentname !== project.assessmentname) {
+                    if (selectedProject?._id !== project._id) {
                       e.currentTarget.style.backgroundColor = '#f7fafc';
                       e.currentTarget.style.borderColor = '#cbd5e0';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (selectedProject?.assessmentname !== project.assessmentname) {
+                    if (selectedProject?._id !== project._id) {
                       e.currentTarget.style.backgroundColor = '#ffffff';
                       e.currentTarget.style.borderColor = '#e2e8f0';
                     }
@@ -2170,7 +2171,7 @@ const renderProjects = () => {
                   <div style={{
                     fontSize: '16px',
                     fontWeight: '600',
-                    color: selectedProject?.assessmentname === project.assessmentname
+                    color: selectedProject?._id === project._id
                       ? '#2b6cb0'
                       : '#1a202c',
                     marginBottom: '6px'

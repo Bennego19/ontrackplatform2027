@@ -35,6 +35,7 @@ import files from './routes/files.mjs';
 import passwordReset from './routes/passwordReset.mjs';
 import db from './db/conn.mjs';
 import { routePolicy } from './middleware/routePolicy.mjs';
+import { makeApiLimiters } from './middleware/apiRateLimit.mjs';
 import { allowedCorsOrigins } from './utils/corsOrigins.mjs';
 
 dotenv.config();
@@ -91,6 +92,7 @@ app.use((req, res, next) => {
 });
 
 // Mount routes
+app.use('/api', ...makeApiLimiters());
 const routes = [
   { path: '/api/onboardstudents', router: onboardstudents, name: 'Onboard Students' },
   { path: '/api/onboardmentors', router: onboardmentors, name: 'Onboard Mentors' },

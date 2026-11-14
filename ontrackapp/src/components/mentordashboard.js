@@ -4,6 +4,29 @@ import DocumentDownloadButton from './DocumentDownloadButton';
 
 import { tokenManager } from '../services/authMiddleware';
 
+function StudentSelector({ students, selected = [], onChange }) {
+  const currentIds = new Set(students.map(student => student.id));
+  const unavailable = selected.filter(id => !currentIds.has(id));
+  const toggle = (id, checked) => onChange(checked ? [...selected, id] : selected.filter(item => item !== id));
+  return (
+    <fieldset style={{ margin: '16px 0', padding: '12px', border: '1px solid #cbd5e0', borderRadius: '6px' }}>
+      <legend>Assign to students</legend>
+      <p>Choose up to 100 assigned students. With none selected, this item remains private to you.</p>
+      {students.length === 0 && <p>No active students are assigned to you.</p>}
+      {students.map(student => (
+        <label key={student.id} style={{ display: 'block', margin: '8px 0' }}>
+          <input type="checkbox" checked={selected.includes(student.id)} disabled={!selected.includes(student.id) && selected.length >= 100} onChange={event => toggle(student.id, event.target.checked)} />{' '}{student.name}{student.email ? ` (${student.email})` : ''}
+        </label>
+      ))}
+      {unavailable.map(id => (
+        <label key={id} style={{ display: 'block', margin: '8px 0' }}>
+          <input type="checkbox" checked onChange={() => toggle(id, false)} /> Previously selected student no longer assigned (remove before saving)
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
 const MentorDashboard = () => {
   // State management
   const [activeTab, setActiveTab] = useState('dashboard-pane');
@@ -22,8 +45,8 @@ const MentorDashboard = () => {
   
   // Form states
   const [newTask, setNewTask] = useState({ title: '', description: '', dueDate: '', priority: 'medium', assignedTo: '', status: 'pending' });
-  const [newAssignment, setNewAssignment] = useState({ title: '', description: '', dueDate: '', maxScore: 100, course: '', instructions: '' });
-  const [newProject, setNewProject] = useState({ title: '', description: '', startDate: '', endDate: '', status: 'planning' });
+  const [newAssignment, setNewAssignment] = useState({ title: '', description: '', dueDate: '', maxScore: 100, course: '', instructions: '', studentIds: [] });
+  const [newProject, setNewProject] = useState({ title: '', description: '', startDate: '', endDate: '', status: 'planning', studentIds: [] });
   const [newResource, setNewResource] = useState({ title: '', description: '', type: 'document', file: null, course: '' });
   
   // Edit states
@@ -192,7 +215,7 @@ const MentorDashboard = () => {
     try {
       const createdAssignment = await mentorAuthAPI.createAssignment(newAssignment);
       setAssignments(prev => [...prev, createdAssignment]);
-      setNewAssignment({ title: '', description: '', dueDate: '', maxScore: 100, course: '', instructions: '' });
+      setNewAssignment({ title: '', description: '', dueDate: '', maxScore: 100, course: '', instructions: '', studentIds: [] });
       setShowAssignmentForm(false);
       setError('');
     } catch (err) {
@@ -230,7 +253,7 @@ const MentorDashboard = () => {
     try {
       const createdProject = await mentorAuthAPI.createProject(newProject);
       setProjects(prev => [...prev, createdProject]);
-      setNewProject({ title: '', description: '', startDate: '', endDate: '', status: 'planning' });
+      setNewProject({ title: '', description: '', startDate: '', endDate: '', status: 'planning', studentIds: [] });
       setShowProjectForm(false);
       setError('');
     } catch (err) {
@@ -1322,6 +1345,8 @@ const MentorDashboard = () => {
               />
             </div>
 
+            <StudentSelector students={assignedStudents} selected={(editingAssignment || newAssignment).studentIds || []}
+              onChange={studentIds => editingAssignment ? setEditingAssignment({ ...editingAssignment, studentIds }) : setNewAssignment({ ...newAssignment, studentIds })} />
             <div style={{ display: 'flex', gap: '8px' }}>
               <button type="submit" style={styles.formButton}>
                 {editingAssignment ? 'Update Assignment' : 'Create Assignment'}
@@ -1331,7 +1356,7 @@ const MentorDashboard = () => {
                 style={styles.formButtonSecondary}
                 onClick={() => {
                   setEditingAssignment(null);
-                  setNewAssignment({ title: '', description: '', dueDate: '', maxScore: 100, course: '', instructions: '' });
+                  setNewAssignment({ title: '', description: '', dueDate: '', maxScore: 100, course: '', instructions: '', studentIds: [] });
                   setShowAssignmentForm(false);
                 }}
               >
@@ -1496,6 +1521,8 @@ const MentorDashboard = () => {
               </select>
             </div>
 
+            <StudentSelector students={assignedStudents} selected={(editingProject || newProject).studentIds || []}
+              onChange={studentIds => editingProject ? setEditingProject({ ...editingProject, studentIds }) : setNewProject({ ...newProject, studentIds })} />
             <div style={{ display: 'flex', gap: '8px' }}>
               <button type="submit" style={styles.formButton}>
                 {editingProject ? 'Update Project' : 'Create Project'}
@@ -1505,7 +1532,7 @@ const MentorDashboard = () => {
                 style={styles.formButtonSecondary}
                 onClick={() => {
                   setEditingProject(null);
-                  setNewProject({ title: '', description: '', startDate: '', endDate: '', status: 'planning' });
+                  setNewProject({ title: '', description: '', startDate: '', endDate: '', status: 'planning', studentIds: [] });
                   setShowProjectForm(false);
                 }}
               >

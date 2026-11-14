@@ -49,6 +49,13 @@ export async function isAssigned(mentorId, studentId) {
   return !!await (await collection('students')).findOne({ _id: new ObjectId(studentId), isActive: { $ne: false }, accessAllowed: 'granted' }, { projection: { _id: 1 } });
 }
 
+export async function areAssigned(mentorId, studentIds) {
+  if (!studentIds.length) return true;
+  const students = await assignedStudents(mentorId);
+  const activeIds = new Set(students.map(student => student.id));
+  return studentIds.every(id => activeIds.has(id));
+}
+
 export async function list(type, mentorId) {
   return (await (await collection(contentCollections[type])).find({ mentorId }).toArray()).map(toResponse);
 }

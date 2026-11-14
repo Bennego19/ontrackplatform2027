@@ -10,7 +10,7 @@ vi.mock('./components/HelpRequests', () => ({ default: () => <div>Private help r
 test('shows the sign-in page at the root route', () => {
   render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
   expect(screen.getByText('OnTrack Connect')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Admin Login' })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: 'Admin' })).toBeInTheDocument();
 });
 
 test('the mentor dashboard accepts a verified mentor account', async () => {

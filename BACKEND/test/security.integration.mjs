@@ -483,8 +483,29 @@ test('student credentials and privileged routes', async () => {
     assert.equal((await request(`/api/mentordashboard/tasks/${task.body.id}`, { method: 'PUT', headers: mentorHeaders, body: JSON.stringify({ ...taskInput, title: 'Updated task' }) })).body.title, 'Updated task');
     assert.equal((await request(`/api/mentordashboard/tasks/${task.body.id}`, { method: 'DELETE', headers: mentorHeaders })).status, 200);
     for (const type of ['assignments', 'projects']) {
-      const createdItem = await request(`/api/mentordashboard/${type}`, { method: 'POST', headers: mentorHeaders, body: JSON.stringify({ title: `Mentor ${type}` }) });
+      const endpoint = `/api/mentordashboard/${type}`;
+      const studentEndpoint = `/api/assessments/${type}`;
+      const itemInput = { title: `Mentor ${type}`, description: 'Selected student content', instructions: 'Complete carefully', dueDate: '2026-12-01', endDate: '2026-12-02', studentIds: [student._id.toString()] };
+      assert.equal((await request(endpoint, { method: 'POST', headers: mentorHeaders, body: JSON.stringify({ ...itemInput, studentIds: ['bad'] }) })).status, 400);
+      assert.equal((await request(endpoint, { method: 'POST', headers: mentorHeaders, body: JSON.stringify({ ...itemInput, studentIds: [second.insertedId.toString()] }) })).status, 403);
+      const createdItem = await request(endpoint, { method: 'POST', headers: mentorHeaders, body: JSON.stringify(itemInput) });
       assert.equal(createdItem.status, 201);
+      const visible = (await request(studentEndpoint, { headers: studentHeaders })).body.find(item => item._id === createdItem.body.id);
+      assert.equal(visible.assessmentname, itemInput.title);
+      assert.equal(visible.description, itemInput.description);
+      assert.equal(visible.datedue, type === 'assignments' ? itemInput.dueDate : itemInput.endDate);
+      if (type === 'assignments') assert.equal(visible.instructions, itemInput.instructions);
+      assert.equal(Object.hasOwn(visible, 'studentIds'), false);
+      await db.collection('mentor_assignments').insertOne({ mentorId: mentorRecord._id, studentId: second.insertedId, status: 'active' });
+      assert.equal((await request(studentEndpoint, { headers: secondHeaders })).body.some(item => item._id === createdItem.body.id), false);
+      assert.equal((await request(`${endpoint}/${createdItem.body.id}`, { method: 'PUT', headers: mentorHeaders, body: JSON.stringify({ ...itemInput, studentIds: [student._id.toString(), second.insertedId.toString()] }) })).status, 200);
+      assert.equal((await request(studentEndpoint, { headers: secondHeaders })).body.some(item => item._id === createdItem.body.id), true);
+      await db.collection('mentor_assignments').updateOne({ mentorId: mentorRecord._id, studentId: second.insertedId }, { $set: { status: 'inactive' } });
+      assert.equal((await request(studentEndpoint, { headers: secondHeaders })).body.some(item => item._id === createdItem.body.id), false);
+      assert.equal((await request(`${endpoint}/${createdItem.body.id}`, { method: 'PUT', headers: mentorHeaders, body: JSON.stringify({ ...itemInput, studentIds: [second.insertedId.toString()] }) })).status, 403);
+      assert.equal((await request(`${endpoint}/${createdItem.body.id}`, { method: 'PUT', headers: mentorHeaders, body: JSON.stringify({ ...itemInput, studentIds: [] }) })).status, 200);
+      assert.equal((await request(studentEndpoint, { headers: studentHeaders })).body.some(item => item._id === createdItem.body.id), false);
+      await db.collection('mentor_assignments').deleteOne({ mentorId: mentorRecord._id, studentId: second.insertedId });
       if (type === 'projects') {
         const managementProjects = await request('/api/projects', { headers: adminHeaders });
         assert.equal(managementProjects.body.some(item => item._id === createdItem.body.id), false);
@@ -529,10 +550,12 @@ test('student credentials and privileged routes', async () => {
       }
       assert.equal((await resetRequest('/api/onboardmentors/login', { method: 'POST', body: JSON.stringify({ username: 'unknown', password: 'invalid-password' }) })).status, 429);
       const counters = await db.collection('rate_limits').find({ _id: /^mentor-login:/ }).toArray();
-      assert.equal(counters.length, 1);
-      assert.equal(counters[0].totalHits, 11);
-      assert.equal(counters[0]._id.includes('127.0.0.1'), false);
-      await db.collection('rate_limits').updateOne({ _id: counters[0]._id }, { $set: { resetTime: new Date(0) } });
+      const blockedCounter = counters.find(counter => counter.totalHits === 11);
+      assert.ok(blockedCounter);
+      assert.equal(blockedCounter._id.includes('127.0.0.1'), false);
+      assert.equal(blockedCounter._id.includes('unknown'), false);
+      assert.equal((await resetRequest('/api/onboardmentors/login', { method: 'POST', body: JSON.stringify({ username: 'different', password: 'invalid-password' }) })).status, 401);
+      await db.collection('rate_limits').updateOne({ _id: blockedCounter._id }, { $set: { resetTime: new Date(0) } });
       assert.equal((await request('/api/onboardmentors/login', { method: 'POST', body: JSON.stringify({ username: 'unknown', password: 'invalid-password' }) })).status, 401);
     } finally { resetServer.kill(); }
     assert.equal((await request('/api/onboardstudents', { headers: { authorization: `Bearer ${studentLogin.body.token}` } })).status, 403);

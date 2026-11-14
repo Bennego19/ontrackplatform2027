@@ -3,8 +3,8 @@ import * as service from '../services/mentorDashboard.mjs';
 
 const allowed = {
   tasks: ['title', 'description', 'dueDate', 'priority', 'assignedTo', 'status'],
-  assignments: ['title', 'description', 'dueDate', 'maxScore', 'course', 'instructions'],
-  projects: ['title', 'description', 'startDate', 'endDate', 'status']
+  assignments: ['title', 'description', 'dueDate', 'maxScore', 'course', 'instructions', 'studentIds'],
+  projects: ['title', 'description', 'startDate', 'endDate', 'status', 'studentIds']
 };
 const mentorId = req => req.dbUser._id.toString();
 const validId = id => typeof id === 'string' && ObjectId.isValid(id);
@@ -15,7 +15,11 @@ function validate(type, body) {
   const values = {};
   for (const field of allowed[type]) {
     if (body[field] === undefined) continue;
-    if (field === 'maxScore') {
+    if (field === 'studentIds') {
+      if (!Array.isArray(body[field]) || body[field].length > 100 || body[field].some(id => !validId(id)) || new Set(body[field]).size !== body[field].length) return null;
+      values[field] = body[field];
+      continue;
+    } else if (field === 'maxScore') {
       if (typeof body[field] !== 'number' || !Number.isFinite(body[field]) || body[field] < 0 || body[field] > 10000) return null;
     } else if (typeof body[field] !== 'string' || body[field].length > 10000) return null;
     values[field] = body[field];
@@ -64,6 +68,7 @@ export const create = type => async (req, res) => {
   if (!fields) return res.status(400).json({ message: 'Invalid details' });
   try {
     if (type === 'tasks' && fields.assignedTo && !await service.isAssigned(mentorId(req), fields.assignedTo)) return res.status(403).json({ message: 'Student is not assigned to this mentor' });
+    if (fields.studentIds && !await service.areAssigned(mentorId(req), fields.studentIds)) return res.status(403).json({ message: 'One or more students are not assigned to this mentor' });
     res.status(201).json(await service.create(type, mentorId(req), fields));
   } catch { failed(res); }
 };
@@ -74,6 +79,7 @@ export const update = type => async (req, res) => {
   if (!fields) return res.status(400).json({ message: 'Invalid details' });
   try {
     if (type === 'tasks' && fields.assignedTo && !await service.isAssigned(mentorId(req), fields.assignedTo)) return res.status(403).json({ message: 'Student is not assigned to this mentor' });
+    if (fields.studentIds && !await service.areAssigned(mentorId(req), fields.studentIds)) return res.status(403).json({ message: 'One or more students are not assigned to this mentor' });
     const item = await service.update(type, mentorId(req), req.params.id, fields);
     if (!item) return res.status(404).json({ message: 'Item not found' });
     res.json(item);
